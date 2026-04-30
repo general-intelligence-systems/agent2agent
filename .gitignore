@@ -1,0 +1,4 @@
+.direnv
+*.gem
+.gem
+.bundler
