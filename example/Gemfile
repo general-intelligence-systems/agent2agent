@@ -3,7 +3,4 @@
 source "https://rubygems.org"
 
 gem "falcon", "~> 0.55"
-gem "async-http", "~> 0.95"
-gem "scampi"
-gem "brute"
-gem "a2a"
+gem "a2a", path: ".."

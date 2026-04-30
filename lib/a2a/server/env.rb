@@ -4,7 +4,7 @@ require "bundler/setup"
 require "a2a"
 
 module A2A
-  module Server
+  class Server
     # Rack middleware that injects shared A2A context into the env.
     #
     # Sets env["a2a.store"] and env["a2a.agent_card"] so downstream

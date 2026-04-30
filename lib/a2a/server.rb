@@ -4,30 +4,13 @@ require "bundler/setup"
 require "a2a"
 
 require "a2a/server/env"
-
-require "a2a/server/send_message"
-require "a2a/server/send_streaming_message"
-require "a2a/server/get_task"
-require "a2a/server/list_tasks"
-require "a2a/server/cancel_task"
-require "a2a/server/subscribe_to_task"
-require "a2a/server/create_task_push_notification_config"
-require "a2a/server/get_task_push_notification_config"
-require "a2a/server/list_task_push_notification_configs"
-require "a2a/server/delete_task_push_notification_config"
-require "a2a/server/get_extended_agent_card"
-
 require "a2a/server/triage"
 require "a2a/server/dispatcher"
-
-require "a2a/bindings/json_rpc"
-require "a2a/bindings/rest"
 
 module A2A
   # Rack application that exposes an A2A-compliant agent server.
   #
-  # Uses Rack::Builder to compose two separate middleware stacks,
-  # one for each protocol binding:
+  # Composes two separate middleware stacks, one for each protocol binding:
   #
   #   /.well-known/agent-card.json
   #     → Env → serve agent card
@@ -38,41 +21,78 @@ module A2A
   #   /     (HTTP+JSON/REST)
   #     → Env → Bindings::Rest → Triage → Dispatcher
   #
-  # The bindings strip/wrap protocol envelopes. Triage resolves the
-  # A2A operation and builds a Schema::Definition request. Dispatcher
-  # calls the matching operation handler, then continues the chain.
+  # Usage:
   #
-  #   run A2A::Server
+  #   agent = A2A::Agent.new do
+  #     on "SendMessage" do |request|
+  #       respond A2A::Schema["Send Message Response"].new({})
+  #     end
+  #   end
   #
-  module Server
-    @app = Rack::Builder.app do
-      use A2A::Server::Env
+  #   app = A2A::Server.new(agent_card: { "name" => "My Agent", ... })
+  #   app.register(agent)
+  #
+  #   run app
+  #
+  class Server
+    def initialize(agent_card: {}, store: TaskStore.new)
+      @agent_card = agent_card
+      @store      = store
+      @dispatcher = Dispatcher.new
+      @app        = build_app
+    end
 
-      map "/.well-known/agent-card.json" do
-        run ->(env) {
-          card = env["a2a.agent_card"] || {}
-          body = card.is_a?(Hash) ? card : card.to_h
-          [200, { "content-type" => "application/json" }, [JSON.generate(body)]]
-        }
-      end
-
-      map "/a2a" do
-        use A2A::Bindings::JsonRpc
-        use A2A::Server::Triage
-        use A2A::Server::Dispatcher
-        run ->(env) { [200, {}, []] }
-      end
-
-      map "/" do
-        use A2A::Bindings::Rest
-        use A2A::Server::Triage
-        use A2A::Server::Dispatcher
-        run ->(env) { [200, {}, []] }
+    # Register an Agent or a plain handler on the internal dispatcher.
+    #
+    # Accepts either:
+    #   - An Agent (responds to #handlers) — registers all its handlers
+    #   - A plain handler (responds to #operations and #call)
+    #
+    def register(handler)
+      if handler.respond_to?(:handlers)
+        handler.handlers.each { |h| @dispatcher.register(h) }
+      else
+        @dispatcher.register(handler)
       end
     end
 
-    def self.call(env)
+    def call(env)
       @app.call(env)
     end
+
+    private
+
+      def build_app
+        require "a2a/bindings/json_rpc"
+        require "a2a/bindings/rest"
+
+        agent_card = @agent_card
+        store      = @store
+        dispatcher = @dispatcher
+
+        Rack::Builder.app do
+          use A2A::Server::Env, agent_card: agent_card, store: store
+
+          map "/.well-known/agent-card.json" do
+            run ->(env) {
+              card = env["a2a.agent_card"] || {}
+              body = card.is_a?(Hash) ? card : card.to_h
+              [200, { "content-type" => "application/json" }, [JSON.generate(body)]]
+            }
+          end
+
+          map "/a2a" do
+            use A2A::Bindings::JsonRpc
+            use A2A::Server::Triage
+            run dispatcher
+          end
+
+          map "/" do
+            use A2A::Bindings::Rest
+            use A2A::Server::Triage
+            run dispatcher
+          end
+        end
+      end
   end
 end

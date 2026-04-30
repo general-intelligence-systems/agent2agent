@@ -4,7 +4,7 @@ require "bundler/setup"
 require "a2a"
 
 module A2A
-  module Server
+  class Server
     # Rack middleware that resolves which A2A operation a request targets.
     #
     # Reads the raw protocol data left in env by the binding middleware

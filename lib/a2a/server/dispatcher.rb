@@ -1,47 +1,127 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
+require "console"
 require "a2a"
 
 module A2A
-  module Server
-    # Rack middleware that dispatches to the correct A2A operation handler.
+  class Server
+    # Routes incoming A2A operations to registered handler objects.
     #
-    # Reads env["a2a.operation"] (set by Triage), looks up the matching
-    # handler from the HANDLERS registry, calls it to set env["a2a.result"],
-    # then continues the middleware chain via @app.call(env).
+    # Each handler declares the operations it handles via `#operations`.
+    # When an operation arrives, the dispatcher finds all matching handlers
+    # and calls them. Errors in one handler do not prevent others from running.
     #
-    # Handlers are plain objects with a #call(env) method — they are NOT
-    # middleware. They set env["a2a.result"] and return.
+    # The Dispatcher is a Rack app (terminal, not middleware). It reads
+    # env["a2a.operation"] set by Triage and fans out to matching handlers.
     #
     class Dispatcher
-      HANDLERS = {
-        "SendMessage"                       => Server::SendMessage,
-        "SendStreamingMessage"              => Server::SendStreamingMessage,
-        "GetTask"                           => Server::GetTask,
-        "ListTasks"                         => Server::ListTasks,
-        "CancelTask"                        => Server::CancelTask,
-        "SubscribeToTask"                   => Server::SubscribeToTask,
-        "CreateTaskPushNotificationConfig"  => Server::CreateTaskPushNotificationConfig,
-        "GetTaskPushNotificationConfig"     => Server::GetTaskPushNotificationConfig,
-        "ListTaskPushNotificationConfigs"   => Server::ListTaskPushNotificationConfigs,
-        "DeleteTaskPushNotificationConfig"  => Server::DeleteTaskPushNotificationConfig,
-        "GetExtendedAgentCard"              => Server::GetExtendedAgentCard,
-      }.freeze
+      def initialize
+        @handlers = Hash.new { |h, k| h[k] = [] }
+      end
 
-      def initialize(app)
-        @app = app
+      # Register a handler object.
+      #
+      # The handler must respond to:
+      #   #operations -> Array<String>  (e.g. ["SendMessage", "GetTask"])
+      #   #call(env)  -> void           (sets env["a2a.result"])
+      #
+      def register(handler)
+        handler.operations.each do |op|
+          @handlers[op] << handler
+          Console.info(self) { "Registered #{handler.class.name} for #{op}" }
+        end
       end
 
       def call(env)
         operation = env["a2a.operation"]
 
-        if operation && (handler_class = HANDLERS[operation])
-          handler_class.new.call(env)
+        if operation
+          dispatch(operation, env)
         end
 
-        @app.call(env)
+        [200, {}, []]
       end
+
+      def handler_count
+        @handlers.values.flatten.size
+      end
+
+      private
+
+        def dispatch(operation, env)
+          handlers = @handlers[operation]
+
+          if handlers.empty?
+            Console.debug(self) { "No handler for operation: #{operation}" }
+          else
+            handlers.each do |handler|
+              begin
+                handler.call(env)
+              rescue => e
+                Console.error(self) { "Handler #{handler.class.name} raised #{e.class}: #{e.message}" }
+              end
+            end
+          end
+        end
+    end
+  end
+end
+
+test do
+  describe "A2A::Server::Dispatcher" do
+    it "registers and dispatches to handlers" do
+      received = []
+      handler = Object.new
+      handler.define_singleton_method(:operations) { ["SendMessage"] }
+      handler.define_singleton_method(:call) { |env| received << env }
+
+      dispatcher = A2A::Server::Dispatcher.new
+      dispatcher.register(handler)
+      dispatcher.handler_count.should == 1
+
+      env = { "a2a.operation" => "SendMessage" }
+      dispatcher.call(env)
+      received.length.should == 1
+    end
+
+    it "ignores operations with no matching handler" do
+      dispatcher = A2A::Server::Dispatcher.new
+      env = { "a2a.operation" => "UnknownOp" }
+      lambda { dispatcher.call(env) }.should.not.raise
+    end
+
+    it "continues dispatching when a handler raises" do
+      results = []
+      bad_handler = Object.new
+      bad_handler.define_singleton_method(:operations) { ["SendMessage"] }
+      bad_handler.define_singleton_method(:call) { |_| raise "boom" }
+
+      good_handler = Object.new
+      good_handler.define_singleton_method(:operations) { ["SendMessage"] }
+      good_handler.define_singleton_method(:call) { |e| results << e }
+
+      dispatcher = A2A::Server::Dispatcher.new
+      dispatcher.register(bad_handler)
+      dispatcher.register(good_handler)
+
+      env = { "a2a.operation" => "SendMessage" }
+      dispatcher.call(env)
+      results.length.should == 1
+    end
+
+    it "dispatches to multiple operations from one handler" do
+      received = []
+      handler = Object.new
+      handler.define_singleton_method(:operations) { ["SendMessage", "GetTask"] }
+      handler.define_singleton_method(:call) { |env| received << env["a2a.operation"] }
+
+      dispatcher = A2A::Server::Dispatcher.new
+      dispatcher.register(handler)
+
+      dispatcher.call({ "a2a.operation" => "SendMessage" })
+      dispatcher.call({ "a2a.operation" => "GetTask" })
+      received.should == ["SendMessage", "GetTask"]
     end
   end
 end

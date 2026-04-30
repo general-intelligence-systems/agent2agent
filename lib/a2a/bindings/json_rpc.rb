@@ -63,7 +63,7 @@ module A2A
 end
 
 test do
-  server = A2A::Server
+  server = A2A::Server.new(agent_card: { "name" => "Test" })
   rack   = Rack::MockRequest.new(server)
 
   A2A::Proto.operations.each do |op|
