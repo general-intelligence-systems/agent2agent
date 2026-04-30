@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+
+wget https://a2a-protocol.org/latest/spec/a2a.json
+wget https://a2a-protocol.org/latest/spec/a2a.proto
