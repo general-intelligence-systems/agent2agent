@@ -5,15 +5,18 @@ require "a2a"
 
 module A2A
   module Bindings
-    # Rack app implementing the A2A HTTP+JSON/REST protocol binding.
+    # Rack middleware implementing the A2A HTTP+JSON/REST protocol binding.
     #
-    # Routes are derived from Proto.operations HTTP annotations.
-    # Each operation's rest_verb + rest_path maps to a snake_case
-    # handler method (e.g. "SendMessage" => #send_message).
+    # Matches the request verb + path against Proto.operations HTTP
+    # annotations. Sets env["a2a.operation"] and env["a2a.params"],
+    # calls downstream, reads env["a2a.result"] (a Schema::Definition),
+    # and formats the REST response.
+    #
+    # Passes through to @app for non-matching requests.
     #
     class Rest
-      def initialize(store: TaskStore.new)
-        @store = store
+      def initialize(app)
+        @app = app
       end
 
       def call(env)
@@ -22,12 +25,7 @@ module A2A
         path = req.path_info
 
         op = match_operation(verb, path)
-        return not_found unless op
-
-        handler = method_name_for(op.name)
-        unless respond_to?(handler, true)
-          return not_found
-        end
+        return @app.call(env) unless op
 
         params = {}
         if req.post? || req.put? || req.patch?
@@ -36,19 +34,20 @@ module A2A
           end
         end
 
-        # Merge path params (e.g. {id}, {configId}) into params
+        # Merge path params (e.g. {id}, {task_id}) into params
         path_params = extract_path_params(op.rest_path, path)
         params.merge!(path_params)
 
         # Merge query params for GET/DELETE
         params.merge!(req.params) if req.get? || req.delete?
 
-        begin
-          result = send(handler, params)
-          success_response(result)
-        rescue => e
-          error_response(500, e.message)
-        end
+        env["a2a.operation"] = op.name
+        env["a2a.params"]    = params
+
+        @app.call(env)
+
+        result = env["a2a.result"]
+        success_response(result)
       end
 
       private
@@ -82,30 +81,23 @@ module A2A
           names.zip(match.captures).to_h
         end
 
-        def method_name_for(name)
-          name.gsub(/([A-Z])/) { "_#{$1.downcase}" }.sub(/^_/, "").to_sym
-        end
-
         def success_response(result)
+          body = result.respond_to?(:to_h) ? result.to_h : (result || {})
           [200, { "content-type" => "application/a2a+json" },
-           [JSON.generate(result)]]
+           [JSON.generate(body)]]
         end
 
         def error_response(status, message)
           [status, { "content-type" => "application/a2a+json" },
            [JSON.generate(error: { code: status, message: message })]]
         end
-
-        def not_found
-          error_response(404, "Not found")
-        end
     end
   end
 end
 
 test do
-  app  = A2A::Bindings::Rest.new
-  rack = Rack::MockRequest.new(app)
+  server = A2A::Server.new
+  rack   = Rack::MockRequest.new(server)
 
   A2A::Proto.operations.each do |op|
     it "#{op.rest_verb.upcase} #{op.rest_path} returns valid #{op.response_type}" do

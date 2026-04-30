@@ -1,13 +1,24 @@
 # frozen_string_literal: true
 
-require_relative "a2a/proto"
-require_relative "a2a/schema"
-require_relative "a2a/server"
-require_relative "a2a/task_store"
-require_relative "a2a/bindings/json_rpc"
-require_relative "a2a/bindings/rest"
-require_relative "a2a/schema/definition"
-require_relative "a2a/schema/validation_error"
+require "bundler/setup"
+
+require "json"
+require "json_schemer"
+require "async"
+require "async/http/internet"
+require "uri"
+require "rack"
 
 module A2A
 end
+
+require "a2a/proto"
+require "a2a/schema"
+require "a2a/schema/definition"
+require "a2a/schema/validation_error"
+require "a2a/task_store"
+
+require "a2a/server"
+
+
+require "a2a/client"

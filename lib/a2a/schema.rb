@@ -3,10 +3,6 @@
 require "bundler/setup"
 require "a2a"
 
-require "json"
-require "json_schemer"
-require "uri"
-
 module A2A
   # Schema-validated A2A protocol objects, powered by json_schemer.
   #
