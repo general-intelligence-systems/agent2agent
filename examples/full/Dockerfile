@@ -12,9 +12,9 @@ COPY data/ data/
 COPY Gemfile ./Gemfile.gem
 
 # Copy example
-COPY example/Gemfile example/config.ru ./example/
+COPY examples/full/Gemfile examples/full/config.ru ./examples/full/
 
-WORKDIR /app/example
+WORKDIR /app/examples/full
 
 RUN bundle install --jobs 4
 

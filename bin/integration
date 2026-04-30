@@ -1,0 +1,503 @@
+#!/usr/bin/env bash
+#
+# Integration test for the full A2A echo agent.
+#
+# Starts docker compose, waits for the server, then exercises all 11
+# operations via curl against both JSON-RPC (/a2a) and REST bindings.
+#
+# Usage:
+#   bin/integration          # run tests (builds if needed)
+#   bin/integration --build  # force rebuild before testing
+#
+set -euo pipefail
+
+COMPOSE_FILE="examples/full/docker-compose.yml"
+BASE="http://localhost:9292"
+PASS=0
+FAIL=0
+ERRORS=""
+
+# ── Colours ───────────────────────────────────────────────────────────
+
+red()   { printf "\033[31m%s\033[0m" "$*"; }
+green() { printf "\033[32m%s\033[0m" "$*"; }
+bold()  { printf "\033[1m%s\033[0m"  "$*"; }
+
+# ── Helpers ───────────────────────────────────────────────────────────
+
+json_rpc() {
+  local method="$1" params="$2" id="${3:-1}"
+  curl -sf -X POST "$BASE/a2a" \
+    -H "Content-Type: application/json" \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":${id},\"method\":\"${method}\",\"params\":${params}}"
+}
+
+rest() {
+  local verb="$1" path="$2" body="${3:-}"
+  if [ -n "$body" ]; then
+    curl -sf -X "$verb" "${BASE}${path}" \
+      -H "Content-Type: application/a2a+json" \
+      -d "$body"
+  else
+    curl -sf -X "$verb" "${BASE}${path}" \
+      -H "Accept: application/a2a+json"
+  fi
+}
+
+# Stream helper: POST, read SSE lines, return them joined by newlines.
+# Times out after 5s so we don't hang forever.
+stream_json_rpc() {
+  local method="$1" params="$2" id="${3:-1}"
+  timeout 5 curl -sN -X POST "$BASE/a2a" \
+    -H "Content-Type: application/json" \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":${id},\"method\":\"${method}\",\"params\":${params}}" \
+    2>/dev/null || true
+}
+
+stream_rest() {
+  local verb="$1" path="$2" body="${3:-}"
+  if [ -n "$body" ]; then
+    timeout 5 curl -sN -X "$verb" "${BASE}${path}" \
+      -H "Content-Type: application/a2a+json" \
+      -d "$body" 2>/dev/null || true
+  else
+    timeout 5 curl -sN -X "$verb" "${BASE}${path}" \
+      -H "Accept: text/event-stream" 2>/dev/null || true
+  fi
+}
+
+assert_json() {
+  local label="$1" response="$2" jq_expr="$3" expected="$4"
+  local actual
+  actual=$(echo "$response" | jq -r "$jq_expr" 2>/dev/null) || actual="JQ_ERROR"
+
+  if [ "$actual" = "$expected" ]; then
+    PASS=$((PASS + 1))
+    echo "  $(green "PASS") $label"
+  else
+    FAIL=$((FAIL + 1))
+    ERRORS="${ERRORS}\n  FAIL: ${label}\n    expected: ${expected}\n    got:      ${actual}"
+    echo "  $(red "FAIL") $label"
+    echo "         expected: $expected"
+    echo "         got:      $actual"
+  fi
+}
+
+assert_contains() {
+  local label="$1" haystack="$2" needle="$3"
+  if echo "$haystack" | grep -qF "$needle"; then
+    PASS=$((PASS + 1))
+    echo "  $(green "PASS") $label"
+  else
+    FAIL=$((FAIL + 1))
+    ERRORS="${ERRORS}\n  FAIL: ${label}\n    expected to contain: ${needle}"
+    echo "  $(red "FAIL") $label"
+    echo "         expected to contain: $needle"
+  fi
+}
+
+assert_json_rpc_error() {
+  local label="$1" response="$2" expected_code="$3"
+  local code
+  code=$(echo "$response" | jq -r '.error.code // empty' 2>/dev/null) || code=""
+
+  if [ "$code" = "$expected_code" ]; then
+    PASS=$((PASS + 1))
+    echo "  $(green "PASS") $label"
+  else
+    FAIL=$((FAIL + 1))
+    ERRORS="${ERRORS}\n  FAIL: ${label}\n    expected error code: ${expected_code}\n    got: ${code}"
+    echo "  $(red "FAIL") $label"
+    echo "         expected error code: $expected_code"
+    echo "         got: $code"
+  fi
+}
+
+# ── Lifecycle ─────────────────────────────────────────────────────────
+
+cleanup() {
+  echo ""
+  echo "Tearing down..."
+  docker compose -f "$COMPOSE_FILE" down --timeout 5 2>/dev/null || true
+}
+trap cleanup EXIT
+
+startup() {
+  local build_flag=""
+  if [ "${1:-}" = "--build" ]; then
+    build_flag="--build"
+  fi
+
+  echo "Starting docker compose..."
+  docker compose -f "$COMPOSE_FILE" up -d $build_flag 2>&1
+
+  echo "Waiting for server..."
+  local attempts=0
+  while ! curl -sf "$BASE/.well-known/agent-card.json" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 60 ]; then
+      echo "$(red "Server failed to start after 60s")"
+      docker compose -f "$COMPOSE_FILE" logs
+      exit 1
+    fi
+    sleep 1
+  done
+  echo "Server is up."
+  echo ""
+}
+
+# ── Tests ─────────────────────────────────────────────────────────────
+
+test_agent_card() {
+  bold "Agent Card"; echo ""
+
+  local r
+  r=$(curl -sf "$BASE/.well-known/agent-card.json")
+
+  assert_json "has name"                "$r" '.name'                           "Full Echo Agent"
+  assert_json "has version"             "$r" '.version'                        "1.0.0"
+  assert_json "has description"         "$r" '.description'                    "A2A echo agent demonstrating all 11 protocol operations."
+  assert_json "streaming capability"    "$r" '.capabilities.streaming'         "true"
+  assert_json "push notifications"      "$r" '.capabilities.pushNotifications' "true"
+  assert_json "has skills"              "$r" '.skills[0].id'                   "echo"
+  assert_json "has supportedInterfaces" "$r" '.supportedInterfaces[0].protocolBinding' "JSONRPC"
+  assert_json "default input modes"     "$r" '.defaultInputModes[0]'           "text/plain"
+  assert_json "default output modes"    "$r" '.defaultOutputModes[0]'          "text/plain"
+  echo ""
+}
+
+test_send_message_jsonrpc() {
+  bold "1. SendMessage (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "SendMessage" '{
+    "message": {
+      "messageId": "msg-sm-1",
+      "role": "ROLE_USER",
+      "parts": [{"text": "Hello, Echo Agent!"}]
+    }
+  }')
+
+  assert_json "no error"             "$r" '.error'                      "null"
+  assert_json "has task id"          "$r" '.result.task // empty | length > 0' "true"
+  assert_json "state is COMPLETED"   "$r" '.result.task.status.state'   "TASK_STATE_COMPLETED"
+  assert_json "has artifact"         "$r" '.result.task.artifacts[0].parts[0].text' "Echo: Hello, Echo Agent!"
+  assert_json "has contextId"        "$r" '.result.task.contextId | length > 0' "true"
+
+  # Stash the task ID for later tests
+  TASK_ID=$(echo "$r" | jq -r '.result.task.id')
+  CONTEXT_ID=$(echo "$r" | jq -r '.result.task.contextId')
+  echo ""
+}
+
+test_send_message_rest() {
+  bold "1b. SendMessage (REST)"; echo ""
+
+  local r
+  r=$(rest POST "/message:send" '{
+    "message": {
+      "messageId": "msg-sm-rest-1",
+      "role": "ROLE_USER",
+      "parts": [{"text": "Hello via REST!"}]
+    }
+  }')
+
+  assert_json "state is COMPLETED" "$r" '.task.status.state'          "TASK_STATE_COMPLETED"
+  assert_json "has echo artifact"  "$r" '.task.artifacts[0].parts[0].text' "Echo: Hello via REST!"
+  echo ""
+}
+
+test_get_task_jsonrpc() {
+  bold "3. GetTask (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "GetTask" "{\"id\": \"${TASK_ID}\"}")
+
+  assert_json "no error"           "$r" '.error'                    "null"
+  assert_json "correct task id"    "$r" '.result.id'                "$TASK_ID"
+  assert_json "state is COMPLETED" "$r" '.result.status.state'      "TASK_STATE_COMPLETED"
+  assert_json "has artifacts"      "$r" '.result.artifacts | length > 0' "true"
+  echo ""
+}
+
+test_get_task_rest() {
+  bold "3b. GetTask (REST)"; echo ""
+
+  local r
+  r=$(rest GET "/tasks/${TASK_ID}")
+
+  assert_json "correct task id"    "$r" '.id'           "$TASK_ID"
+  assert_json "state is COMPLETED" "$r" '.status.state' "TASK_STATE_COMPLETED"
+  echo ""
+}
+
+test_get_task_not_found() {
+  bold "3c. GetTask — not found (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "GetTask" '{"id": "nonexistent-task-id"}')
+
+  assert_json_rpc_error "returns -32001" "$r" "-32001"
+  echo ""
+}
+
+test_list_tasks_jsonrpc() {
+  bold "4. ListTasks (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "ListTasks" "{\"contextId\": \"${CONTEXT_ID}\"}")
+
+  assert_json "no error"      "$r" '.error'                         "null"
+  assert_json "has tasks"     "$r" '.result.tasks | length > 0'     "true"
+  assert_json "has totalSize" "$r" '.result.totalSize > 0'          "true"
+  assert_json "has pageSize"  "$r" '.result.pageSize > 0'           "true"
+  echo ""
+}
+
+test_list_tasks_rest() {
+  bold "4b. ListTasks (REST)"; echo ""
+
+  local r
+  r=$(rest GET "/tasks?contextId=${CONTEXT_ID}")
+
+  assert_json "has tasks" "$r" '.tasks | length > 0' "true"
+  echo ""
+}
+
+test_cancel_task_jsonrpc() {
+  bold "5. CancelTask (JSON-RPC)"; echo ""
+
+  # First create a task we can cancel — send a message to get a new task
+  # Then try to cancel the already-completed task (should fail)
+  local r
+  r=$(json_rpc "CancelTask" "{\"id\": \"${TASK_ID}\"}")
+
+  assert_json_rpc_error "rejects terminal task with -32002" "$r" "-32002"
+
+  # Now create a fresh task that we'll cancel
+  # We need a task in a non-terminal state. Since SendMessage completes
+  # immediately, we test the error path here. A streaming task would be
+  # needed for a real cancel test.
+  echo ""
+}
+
+test_cancel_task_not_found() {
+  bold "5b. CancelTask — not found (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "CancelTask" '{"id": "nonexistent-id"}')
+
+  assert_json_rpc_error "returns -32001" "$r" "-32001"
+  echo ""
+}
+
+test_streaming_message_jsonrpc() {
+  bold "2. SendStreamingMessage (JSON-RPC SSE)"; echo ""
+
+  local r
+  r=$(stream_json_rpc "SendStreamingMessage" '{
+    "message": {
+      "messageId": "msg-stream-1",
+      "role": "ROLE_USER",
+      "parts": [{"text": "Stream me!"}]
+    }
+  }')
+
+  assert_contains "has SSE data lines"     "$r" "data: "
+  assert_contains "has WORKING state"      "$r" "TASK_STATE_WORKING"
+  assert_contains "has artifact update"    "$r" "artifactUpdate"
+  assert_contains "has echo text"          "$r" "Echo: Stream me!"
+  assert_contains "has COMPLETED state"    "$r" "TASK_STATE_COMPLETED"
+  echo ""
+}
+
+test_streaming_message_rest() {
+  bold "2b. SendStreamingMessage (REST SSE)"; echo ""
+
+  local r
+  r=$(stream_rest POST "/message:stream" '{
+    "message": {
+      "messageId": "msg-stream-rest-1",
+      "role": "ROLE_USER",
+      "parts": [{"text": "Stream via REST!"}]
+    }
+  }')
+
+  assert_contains "has SSE data lines"  "$r" "data: "
+  assert_contains "has WORKING state"   "$r" "TASK_STATE_WORKING"
+  assert_contains "has echo text"       "$r" "Echo: Stream via REST!"
+  assert_contains "has COMPLETED state" "$r" "TASK_STATE_COMPLETED"
+  echo ""
+}
+
+test_push_notification_crud() {
+  bold "7-10. Push Notification Config CRUD (JSON-RPC)"; echo ""
+
+  # 7. Create
+  local create_r
+  create_r=$(json_rpc "CreateTaskPushNotificationConfig" "{
+    \"taskId\": \"${TASK_ID}\",
+    \"url\": \"https://example.com/webhook\",
+    \"token\": \"test-token-123\",
+    \"authentication\": {\"scheme\": \"Bearer\", \"credentials\": \"my-secret\"}
+  }")
+
+  assert_json "create: no error"  "$create_r" '.error'       "null"
+  assert_json "create: has url"   "$create_r" '.result.url'   "https://example.com/webhook"
+  assert_json "create: has token" "$create_r" '.result.token'  "test-token-123"
+
+  local CONFIG_ID
+  CONFIG_ID=$(echo "$create_r" | jq -r '.result.id')
+  assert_json "create: has id" "$create_r" '.result.id | length > 0' "true"
+
+  # 8. Get
+  local get_r
+  get_r=$(json_rpc "GetTaskPushNotificationConfig" "{
+    \"taskId\": \"${TASK_ID}\",
+    \"id\": \"${CONFIG_ID}\"
+  }")
+
+  assert_json "get: no error" "$get_r" '.error'      "null"
+  assert_json "get: correct id" "$get_r" '.result.id' "$CONFIG_ID"
+  assert_json "get: correct url" "$get_r" '.result.url' "https://example.com/webhook"
+
+  # 9. List
+  local list_r
+  list_r=$(json_rpc "ListTaskPushNotificationConfigs" "{\"taskId\": \"${TASK_ID}\"}")
+
+  assert_json "list: no error"     "$list_r" '.error'                       "null"
+  assert_json "list: has configs"  "$list_r" '.result.configs | length > 0' "true"
+  assert_json "list: config url"   "$list_r" '.result.configs[0].url'       "https://example.com/webhook"
+
+  # 10. Delete
+  local del_r
+  del_r=$(json_rpc "DeleteTaskPushNotificationConfig" "{
+    \"taskId\": \"${TASK_ID}\",
+    \"id\": \"${CONFIG_ID}\"
+  }")
+
+  assert_json "delete: no error" "$del_r" '.error' "null"
+
+  # Verify it's gone
+  local list_after
+  list_after=$(json_rpc "ListTaskPushNotificationConfigs" "{\"taskId\": \"${TASK_ID}\"}")
+  assert_json "delete: list empty" "$list_after" '.result.configs | length' "0"
+
+  echo ""
+}
+
+test_push_notification_not_found() {
+  bold "7b. Push Notification Config — task not found (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "CreateTaskPushNotificationConfig" '{
+    "taskId": "nonexistent-task",
+    "url": "https://example.com/hook"
+  }')
+
+  assert_json_rpc_error "returns -32001" "$r" "-32001"
+  echo ""
+}
+
+test_extended_agent_card() {
+  bold "11. GetExtendedAgentCard (JSON-RPC)"; echo ""
+
+  local r
+  r=$(json_rpc "GetExtendedAgentCard" '{}')
+
+  assert_json_rpc_error "returns -32004 unsupported" "$r" "-32004"
+  echo ""
+}
+
+test_extended_agent_card_rest() {
+  bold "11b. GetExtendedAgentCard (REST)"; echo ""
+
+  # REST binding returns an error via env["a2a.error"], check status
+  local r http_code
+  http_code=$(curl -sf -o /dev/null -w "%{http_code}" "$BASE/extendedAgentCard" \
+    -H "Accept: application/a2a+json" 2>/dev/null) || http_code="000"
+
+  # REST errors should return non-200
+  if [ "$http_code" != "200" ]; then
+    PASS=$((PASS + 1))
+    echo "  $(green "PASS") returns error status ($http_code)"
+  else
+    # Even if 200, check the response body
+    r=$(rest GET "/extendedAgentCard" 2>/dev/null) || r=""
+    if echo "$r" | grep -qF "UNSUPPORTED_OPERATION" 2>/dev/null; then
+      PASS=$((PASS + 1))
+      echo "  $(green "PASS") returns unsupported operation error in body"
+    else
+      FAIL=$((FAIL + 1))
+      echo "  $(red "FAIL") expected error, got HTTP $http_code"
+    fi
+  fi
+  echo ""
+}
+
+test_subscribe_to_task_terminal() {
+  bold "6. SubscribeToTask — terminal state error (JSON-RPC)"; echo ""
+
+  # Subscribing to a completed task should return an error
+  local r
+  r=$(json_rpc "SubscribeToTask" "{\"id\": \"${TASK_ID}\"}")
+
+  assert_json_rpc_error "rejects terminal task with -32004" "$r" "-32004"
+  echo ""
+}
+
+# ── Main ──────────────────────────────────────────────────────────────
+
+main() {
+  echo ""
+  echo "$(bold "A2A Full Example — Integration Tests")"
+  echo "======================================="
+  echo ""
+
+  startup "${1:-}"
+
+  # Run all tests
+  test_agent_card
+
+  test_send_message_jsonrpc
+  test_send_message_rest
+
+  test_streaming_message_jsonrpc
+  test_streaming_message_rest
+
+  test_get_task_jsonrpc
+  test_get_task_rest
+  test_get_task_not_found
+
+  test_list_tasks_jsonrpc
+  test_list_tasks_rest
+
+  test_cancel_task_jsonrpc
+  test_cancel_task_not_found
+
+  test_subscribe_to_task_terminal
+
+  test_push_notification_crud
+  test_push_notification_not_found
+
+  test_extended_agent_card
+  test_extended_agent_card_rest
+
+  # Summary
+  echo "======================================="
+  local total=$((PASS + FAIL))
+  echo "$(bold "Results:") $(green "$PASS passed"), $(red "$FAIL failed") / $total total"
+
+  if [ "$FAIL" -gt 0 ]; then
+    echo ""
+    echo "$(red "Failures:")"
+    echo -e "$ERRORS"
+    echo ""
+    exit 1
+  fi
+
+  echo ""
+  exit 0
+}
+
+main "$@"
