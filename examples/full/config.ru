@@ -62,6 +62,7 @@
 #     }'
 
 require "bundler/setup"
+require "scampi"
 require "a2a"
 require "console"
 require "securerandom"

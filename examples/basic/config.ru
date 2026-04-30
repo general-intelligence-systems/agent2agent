@@ -13,6 +13,7 @@
 #     -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{}}'
 
 require "bundler/setup"
+require "scampi"
 require "a2a"
 require "console"
 
