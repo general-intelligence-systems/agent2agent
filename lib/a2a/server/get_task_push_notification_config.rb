@@ -4,17 +4,10 @@ require "bundler/setup"
 require "a2a"
 
 module A2A
-  class Server
+  module Server
     class GetTaskPushNotificationConfig
-      def initialize(app)
-        @app = app
-      end
-
       def call(env)
-        return @app.call(env) unless env["a2a.operation"] == "GetTaskPushNotificationConfig"
-
         env["a2a.result"] = Schema["Task Push Notification Config"].new({})
-        @app.call(env)
       end
     end
   end

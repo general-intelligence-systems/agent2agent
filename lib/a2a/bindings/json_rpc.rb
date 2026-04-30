@@ -2,17 +2,15 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/server"
 
 module A2A
   module Bindings
     # Rack middleware implementing the A2A JSON-RPC 2.0 protocol binding.
     #
-    # Parses the JSON-RPC envelope, sets env["a2a.operation"] and
-    # env["a2a.params"], calls downstream, reads env["a2a.result"]
-    # (a Schema::Definition), and wraps it in the JSON-RPC response.
-    #
-    # Passes through to @app for non-JSON-RPC requests.
+    # Strips the JSON-RPC envelope from the inbound request, setting
+    # env keys for the method name, request id, and parsed params.
+    # Calls downstream. On return, wraps env["a2a.result"] back into
+    # a JSON-RPC response envelope.
     #
     class JsonRpc
       def initialize(app)
@@ -20,32 +18,27 @@ module A2A
       end
 
       def call(env)
-        # If another binding already identified the operation, pass through.
-        return @app.call(env) if env["a2a.operation"]
-
-        req = Rack::Request.new(env)
-        return @app.call(env) unless req.post?
-
+        req  = Rack::Request.new(env)
         body = req.body.read
         req.body.rewind
 
         begin
           rpc = JSON.parse(body)
         rescue JSON::ParserError
-          return @app.call(env)
+          return error_response(nil, -32700, "Parse error")
         end
 
-        return @app.call(env) unless rpc.is_a?(Hash) && rpc["jsonrpc"]
+        unless rpc.is_a?(Hash) && rpc["jsonrpc"] == "2.0"
+          return error_response(nil, -32600, "Invalid Request")
+        end
 
         id     = rpc["id"]
         method = rpc["method"]
         params = rpc["params"] || {}
 
-        op = Proto.operation(method)
-        return error_response(id, -32601, "Method not found") unless op
-
-        env["a2a.operation"] = op.name
-        env["a2a.params"]    = params
+        env["a2a.json_rpc_id"]     = id
+        env["a2a.json_rpc_method"] = method
+        env["a2a.body"]            = params
 
         @app.call(env)
 
@@ -70,7 +63,7 @@ module A2A
 end
 
 test do
-  server = A2A::Server.new
+  server = A2A::Server
   rack   = Rack::MockRequest.new(server)
 
   A2A::Proto.operations.each do |op|
@@ -82,18 +75,16 @@ test do
         params: {}
       })
 
-      response = rack.post("/", input: body, "CONTENT_TYPE" => "application/json")
+      response = rack.post("/a2a", input: body, "CONTENT_TYPE" => "application/json")
       parsed   = JSON.parse(response.body)
 
-      if parsed["error"]
-        parsed["error"].should.be.nil
+      parsed["error"].should.be.nil
+
+      if op.response_schema
+        result = parsed["result"]
+        schema_obj = op.response_schema.new(result)
+        schema_obj.valid?.should == true
       end
-
-      next unless op.response_schema
-
-      result = parsed["result"]
-      schema_obj = op.response_schema.new(result)
-      schema_obj.valid?.should == true
     end
   end
 end

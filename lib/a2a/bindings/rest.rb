@@ -7,12 +7,9 @@ module A2A
   module Bindings
     # Rack middleware implementing the A2A HTTP+JSON/REST protocol binding.
     #
-    # Matches the request verb + path against Proto.operations HTTP
-    # annotations. Sets env["a2a.operation"] and env["a2a.params"],
-    # calls downstream, reads env["a2a.result"] (a Schema::Definition),
-    # and formats the REST response.
-    #
-    # Passes through to @app for non-matching requests.
+    # Extracts the HTTP verb, path, and request body/params into env keys.
+    # Calls downstream. On return, wraps env["a2a.result"] into a REST
+    # response with content-type application/a2a+json.
     #
     class Rest
       def initialize(app)
@@ -20,12 +17,10 @@ module A2A
       end
 
       def call(env)
-        req  = Rack::Request.new(env)
-        verb = req.request_method.downcase
-        path = req.path_info
+        req = Rack::Request.new(env)
 
-        op = match_operation(verb, path)
-        return @app.call(env) unless op
+        env["a2a.verb"] = req.request_method.downcase
+        env["a2a.path"] = req.path_info
 
         params = {}
         if req.post? || req.put? || req.patch?
@@ -34,15 +29,10 @@ module A2A
           end
         end
 
-        # Merge path params (e.g. {id}, {task_id}) into params
-        path_params = extract_path_params(op.rest_path, path)
-        params.merge!(path_params)
-
         # Merge query params for GET/DELETE
         params.merge!(req.params) if req.get? || req.delete?
 
-        env["a2a.operation"] = op.name
-        env["a2a.params"]    = params
+        env["a2a.body"] = params
 
         @app.call(env)
 
@@ -51,35 +41,6 @@ module A2A
       end
 
       private
-
-        def match_operation(verb, path)
-          Proto.operations.find do |op|
-            op.http_bindings.any? do |b|
-              b.verb == verb && path_matches?(b.path, path)
-            end
-          end
-        end
-
-        # Match a proto path pattern like "/tasks/{id=*}" against
-        # an actual request path like "/tasks/abc-123".
-        def path_matches?(pattern, path)
-          regex = pattern_to_regex(pattern)
-          path.match?(regex)
-        end
-
-        def pattern_to_regex(pattern)
-          re = pattern.gsub(/\{[^}]+\}/, '([^/]+)')
-          /\A#{re}\z/
-        end
-
-        def extract_path_params(pattern, path)
-          names = pattern.scan(/\{(\w+)(?:=[^}]*)?\}/).flatten
-          regex = pattern_to_regex(pattern)
-          match = path.match(regex)
-          return {} unless match
-
-          names.zip(match.captures).to_h
-        end
 
         def success_response(result)
           body = result.respond_to?(:to_h) ? result.to_h : (result || {})
@@ -96,7 +57,7 @@ module A2A
 end
 
 test do
-  server = A2A::Server.new
+  server = A2A::Server
   rack   = Rack::MockRequest.new(server)
 
   A2A::Proto.operations.each do |op|
@@ -115,14 +76,12 @@ test do
 
       parsed = JSON.parse(response.body)
 
-      if parsed["error"]
-        parsed["error"].should.be.nil
+      parsed["error"].should.be.nil
+
+      if op.response_schema
+        schema_obj = op.response_schema.new(parsed)
+        schema_obj.valid?.should == true
       end
-
-      next unless op.response_schema
-
-      schema_obj = op.response_schema.new(parsed)
-      schema_obj.valid?.should == true
     end
   end
 end
