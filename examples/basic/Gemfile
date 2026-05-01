@@ -4,4 +4,4 @@ source "https://rubygems.org"
 
 gem "falcon", "~> 0.55"
 gem "scampi"
-gem "a2a", path: "../.."
+gem "agent2agent", path: "../.."
