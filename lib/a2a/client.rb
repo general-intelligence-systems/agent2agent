@@ -44,7 +44,7 @@ module A2A
           params: params,
         )
 
-        response = post("/", body, "application/json")
+        response = post("/a2a", body, "application/json")
         parsed = JSON.parse(response)
 
         if (error = parsed["error"])

@@ -207,6 +207,34 @@ test_send_message_rest() {
   echo ""
 }
 
+test_client_send_message() {
+  bold "1c. SendMessage (A2A::Client)"; echo ""
+
+  local r
+  r=$(docker compose -f "$COMPOSE_FILE" exec -T echo-agent \
+    ruby -e '
+      require "bundler/setup"
+      require "a2a"
+      require "json"
+      Async do
+        client = A2A::Client.new("http://localhost:9292")
+        result = client.send_message(
+          message: {
+            "messageId" => "client-test-1",
+            "role" => "ROLE_USER",
+            "parts" => [{ "text" => "Client test" }],
+          }
+        )
+        puts JSON.generate(result)
+      end
+    ')
+
+  assert_json "has task"             "$r" '.task // empty | length > 0'      "true"
+  assert_json "state is COMPLETED"   "$r" '.task.status.state'              "TASK_STATE_COMPLETED"
+  assert_json "has echo artifact"    "$r" '.task.artifacts[0].parts[0].text' "Echo: Client test"
+  echo ""
+}
+
 test_get_task_jsonrpc() {
   bold "3. GetTask (JSON-RPC)"; echo ""
 
@@ -461,6 +489,7 @@ main() {
 
   test_send_message_jsonrpc
   test_send_message_rest
+  test_client_send_message
 
   test_streaming_message_jsonrpc
   test_streaming_message_rest

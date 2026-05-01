@@ -192,15 +192,15 @@ agent = A2A::Agent.new do
       })
       store.complete(task_id, nil)
     rescue => e
-      Console.error(self) { "Delegation to #{chosen_agent} failed: #{e.message}" }
+      Console.error(self) { "Delegation to #{chosen_agent} failed: #{e.class}: #{e.message}\n#{e.backtrace&.join("\n")}" }
 
       artifact = {
         "artifactId" => SecureRandom.uuid,
         "name"       => "error",
-        "parts"      => [{ "text" => "Failed to delegate to #{chosen_agent}: #{e.message}" }],
+        "parts"      => [{ "text" => "Failed to delegate to #{chosen_agent}. Check server logs for details." }],
       }
       store.add_artifact(task_id, artifact)
-      store.fail(task_id, e.message)
+      store.fail(task_id, "Delegation to #{chosen_agent} failed")
     end
 
     task = store.get(task_id)

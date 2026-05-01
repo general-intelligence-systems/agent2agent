@@ -1,10 +1,6 @@
 services:
   greeter:
-    build:
-      context: ../..
-      dockerfile: examples/multi-agent/Dockerfile
-      args:
-        SERVICE: greeter
+    build: ./greeter
     restart: unless-stopped
     ports:
       - 9292:9292
@@ -15,11 +11,7 @@ services:
       - MODEL=${MODEL:-claude-sonnet-4-20250514}
 
   translator:
-    build:
-      context: ../..
-      dockerfile: examples/multi-agent/Dockerfile
-      args:
-        SERVICE: translator
+    build: ./translator
     restart: unless-stopped
     ports:
       - 9293:9293
@@ -30,11 +22,7 @@ services:
       - MODEL=${MODEL:-claude-sonnet-4-20250514}
 
   host:
-    build:
-      context: ../..
-      dockerfile: examples/multi-agent/Dockerfile
-      args:
-        SERVICE: host
+    build: ./host
     restart: unless-stopped
     ports:
       - 9294:9294

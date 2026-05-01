@@ -29,7 +29,7 @@ Requires an LLM API key. Set one of:
 
 ## Running
 
-### Directly (recommended)
+### Directly
 
 ```sh
 cd examples/multi-agent
@@ -41,7 +41,7 @@ cd ../translator && bundle exec falcon serve --bind http://0.0.0.0:9293 &
 cd ../host && bundle exec falcon serve --bind http://0.0.0.0:9294 &
 ```
 
-### With Docker
+### With Docker (recommended)
 
 ```sh
 ANTHROPIC_API_KEY=sk-... docker compose up --build
