@@ -11,6 +11,10 @@ Gem::Specification.new do |spec|
   spec.license       = 'MIT'
   spec.required_ruby_version = '>= 3.2'
 
+  spec.metadata = {
+    "documentation_uri" => "https://general-intelligence-systems.github.io/agent2agent/",
+  }
+
   spec.files         = Dir['lib/**/*.rb', 'lib/**/*.txt', 'data/**/*']
   spec.require_paths = ['lib']
 
