@@ -26,19 +26,19 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 
   - [Protocol Operations](https://general-intelligence-systems.github.io/agent2agent/guides/protocol-operations/index) - This guide covers all 11 A2A operations and task state lifecycle.
 
-## Examples
+  - [Example: Echo Agent](https://general-intelligence-systems.github.io/agent2agent/guides/examples-basic/index) - A minimal A2A agent that echoes messages back.
 
-Each example includes a `config.ru`, `Gemfile`, `Dockerfile`, and `docker-compose.yml`.
+  - [Example: Multi-Turn](https://general-intelligence-systems.github.io/agent2agent/guides/examples-multi-turn/index) - Demonstrates the INPUT_REQUIRED state for multi-turn confirmation-gated conversations.
 
-| Example | What it shows |
-|---------|---------------|
-| [`basic/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic) | Minimal echo agent, 2 operations |
-| [`full/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full) | All 11 operations, SQLite, SSE, push notifications |
-| [`streaming-artifacts/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts) | Chunked artifact streaming with `append`/`lastChunk` |
-| [`multi-turn/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-turn) | `INPUT_REQUIRED` for confirmation-gated conversations |
-| [`async-jobs/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs) | Background processing with `returnImmediately` + polling/SSE |
-| [`push-notifications/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications) | Webhook delivery (2-service Docker setup) |
-| [`multi-agent/`](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent) | LLM-powered orchestration routing to remote agents via `A2A::Client` |
+  - [Example: Async Jobs](https://general-intelligence-systems.github.io/agent2agent/guides/examples-async-jobs/index) - Non-blocking background processing with returnImmediately, SSE subscriptions, and polling.
+
+  - [Example: Streaming Artifacts](https://general-intelligence-systems.github.io/agent2agent/guides/examples-streaming/index) - Chunked artifact streaming with append/lastChunk semantics over SSE.
+
+  - [Example: Push Notifications](https://general-intelligence-systems.github.io/agent2agent/guides/examples-push-notifications/index) - Webhook-based push notification delivery with a two-service Docker setup.
+
+  - [Example: Multi-Agent](https://general-intelligence-systems.github.io/agent2agent/guides/examples-multi-agent/index) - LLM-powered orchestration routing requests to remote agents via A2A::Client.
+
+  - [Example: Full Agent](https://general-intelligence-systems.github.io/agent2agent/guides/examples-full/index) - All 11 A2A protocol operations in a single agent with SQLite, SSE, and push notifications.
 
 ## Development
 

@@ -75,7 +75,7 @@ Expected output:
 }
 ```
 
-This is a bare-bones echo agent -- it returns an empty response object. See the [full example](../full/) for a complete implementation with all 11 operations.
+This is a bare-bones echo agent -- it returns an empty response object. See the [full example](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/full) for a complete implementation with all 11 operations.
 
 ## Step 5: Cleanup
 
