@@ -1,8 +1,8 @@
 # Echo Agent
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic)
-
 A minimal A2A agent that echoes messages back. The simplest starting point for understanding the A2A protocol.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic)
 
 ## What you'll learn
 
@@ -95,3 +95,5 @@ docker compose down
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic)

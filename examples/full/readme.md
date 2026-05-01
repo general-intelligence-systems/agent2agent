@@ -1,8 +1,8 @@
 # Full Echo Agent
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full)
-
 Demonstrates all 11 A2A protocol operations in a single agent with Falcon-native SSE streaming and a SQLite-backed persistent task store.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full)
 
 ## What you'll learn
 
@@ -507,3 +507,5 @@ docker compose down
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full)

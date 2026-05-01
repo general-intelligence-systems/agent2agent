@@ -1,8 +1,8 @@
 # Multi-Turn Conversation
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-turn)
-
 Demonstrates the `INPUT_REQUIRED` state for multi-turn interactions where the agent asks for user confirmation before proceeding.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-turn)
 
 ## What you'll learn
 
@@ -186,3 +186,5 @@ docker compose down
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-turn)

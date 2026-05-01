@@ -1,8 +1,8 @@
 # Async Jobs
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs)
-
 Demonstrates non-blocking task processing with background fibers, live progress via SSE, and polling.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs)
 
 ## What you'll learn
 
@@ -230,3 +230,5 @@ docker compose down
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs)

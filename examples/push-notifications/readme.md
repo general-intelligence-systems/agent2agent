@@ -1,8 +1,8 @@
 # Push Notifications
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications)
-
 Demonstrates asynchronous task processing with webhook-based push notification delivery for status and artifact updates.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications)
 
 ## What you'll learn
 
@@ -337,3 +337,5 @@ docker compose down
 | `receiver/Gemfile` | Receiver dependencies |
 | `receiver/Dockerfile` | Container build for the receiver service |
 | `docker-compose.yml` | Two-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications)

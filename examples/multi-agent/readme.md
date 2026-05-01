@@ -1,8 +1,8 @@
 # Multi-Agent Orchestration
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent)
-
 Three A2A agents communicating via the protocol: an LLM-powered orchestrator discovers remote agents and delegates tasks to the most appropriate one.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent)
 
 ## What you'll learn
 
@@ -227,3 +227,5 @@ docker compose down
 | `*/Gemfile` | Per-service dependencies |
 | `*/Dockerfile` | Per-service container build |
 | `docker-compose.yml` | Three-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent)

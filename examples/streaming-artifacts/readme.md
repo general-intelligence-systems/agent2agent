@@ -1,8 +1,8 @@
 # Streaming Artifacts
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts)
-
 Demonstrates chunked artifact streaming with `append`/`lastChunk` semantics, streaming multiple files as separate artifacts over SSE.
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts)
 
 ## What you'll learn
 
@@ -157,3 +157,5 @@ docker compose down
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
+
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts)
