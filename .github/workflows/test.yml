@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  BUNDLE_WITHOUT: maintenance
+
 jobs:
   test:
     runs-on: ubuntu-latest
