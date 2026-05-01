@@ -51,4 +51,4 @@ bin/integration   # full protocol test against both bindings (requires Docker)
 
 ## License
 
-MIT
+Apache 2.0
