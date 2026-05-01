@@ -1,8 +1,5 @@
 # agent2agent
 
-> [!TIP]
-> There are lots of [step-by-step examples](https://general-intelligence-systems.github.io/agent2agent/guides/examples-full/index) available in the docs.
-
 A Ruby implementation of Google's [Agent-to-Agent (A2A) protocol](https://a2a-protocol.org/) -- an open standard for interoperable communication between AI agents.
 
 Build A2A-compliant agents that can communicate with any other A2A agent regardless of language or framework. Ships with server and client, both protocol bindings (JSON-RPC 2.0 and HTTP+JSON/REST), SSE streaming, SQLite persistence, and push notifications.
