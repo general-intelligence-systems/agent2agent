@@ -106,19 +106,20 @@ agent_card = {
 }
 
 # ─── Helpers ──────────────────────────────────────────────────────────
+#
+# These are lambdas (not defs) so they remain accessible inside
+# Agent handler blocks, which run via instance_exec on a Context object.
 
 # Extract the concatenated text from a message's parts array.
-def extract_text(message)
+extract_text = ->(message) {
   parts = message.respond_to?(:parts) ? message.parts : (message["parts"] || [])
   parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
-end
+}
 
 # Build a timestamp string.
-def now_ts
-  Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ")
-end
+now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
-TERMINAL_STATES = A2A::TaskStore::TERMINAL_STATES
+terminal_states = A2A::TaskStore::TERMINAL_STATES
 
 # ─── Agent: all 11 operations ────────────────────────────────────────
 
@@ -131,7 +132,7 @@ agent = A2A::Agent.new do
   #
   on "SendMessage" do |request|
     msg = request.message
-    text = extract_text(msg)
+    text = extract_text.(msg)
 
     task_id    = msg.respond_to?(:task_id)    ? msg.task_id    : msg["taskId"]
     context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
@@ -156,7 +157,7 @@ agent = A2A::Agent.new do
         @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id } }] }
         next
       end
-      if TERMINAL_STATES.include?(existing.state)
+      if terminal_states.include?(existing.state)
         respond nil
         @env["a2a.error"] = { code: -32004, message: "Task is in a terminal state", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org" }] }
         next
@@ -221,7 +222,7 @@ agent = A2A::Agent.new do
   #
   on "SendStreamingMessage" do |request|
     msg = request.message
-    text = extract_text(msg)
+    text = extract_text.(msg)
 
     context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
     message_id = msg.respond_to?(:message_id) ? msg.message_id : msg["messageId"]
@@ -250,7 +251,7 @@ agent = A2A::Agent.new do
           "contextId" => task.context_id,
           "status"    => {
             "state"     => "TASK_STATE_WORKING",
-            "timestamp" => now_ts,
+            "timestamp" => now_ts.(),
           },
         },
       }
@@ -292,7 +293,7 @@ agent = A2A::Agent.new do
           "contextId" => context_id,
           "status"    => {
             "state"     => "TASK_STATE_COMPLETED",
-            "timestamp" => now_ts,
+            "timestamp" => now_ts.(),
           },
         },
       }
@@ -424,7 +425,7 @@ agent = A2A::Agent.new do
       next
     end
 
-    if TERMINAL_STATES.include?(task.state)
+    if terminal_states.include?(task.state)
       respond nil
       @env["a2a.error"] = { code: -32002, message: "Task is not cancelable", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_CANCELABLE", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id, "state" => task.state } }] }
       next
@@ -459,7 +460,7 @@ agent = A2A::Agent.new do
       next
     end
 
-    if TERMINAL_STATES.include?(task.state)
+    if terminal_states.include?(task.state)
       respond nil
       @env["a2a.error"] = { code: -32004, message: "Cannot subscribe to a task in a terminal state", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id, "state" => task.state } }] }
       next
@@ -505,7 +506,7 @@ agent = A2A::Agent.new do
         # If the status event indicates a terminal state, we're done
         if event[:type] == :status
           state = event[:data].dig("status", "state")
-          break if TERMINAL_STATES.include?(state)
+          break if terminal_states.include?(state)
         end
       end
 

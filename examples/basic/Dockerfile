@@ -12,7 +12,7 @@ COPY data/ data/
 COPY Gemfile ./Gemfile.gem
 
 # Copy example
-COPY examples/basic/Gemfile examples/basic/config.ru ./examples/basic/
+COPY examples/basic/Gemfile examples/basic/config.ru examples/basic/falcon.rb ./examples/basic/
 
 WORKDIR /app/examples/basic
 
@@ -20,4 +20,4 @@ RUN bundle install --jobs 4
 
 EXPOSE 9292
 
-CMD ["bundle", "exec", "falcon", "serve", "--bind", "http://0.0.0.0:9292"]
+CMD ["bundle", "exec", "falcon", "host"]
