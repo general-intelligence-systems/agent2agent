@@ -6,7 +6,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy a2a gem source
-COPY a2a.gemspec ./
+COPY agent2agent.gemspec ./
 COPY lib/ lib/
 COPY data/ data/
 COPY Gemfile ./Gemfile.gem
