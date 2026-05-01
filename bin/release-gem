@@ -1,11 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../lib/brute/version"
+require_relative "../lib/a2a/version"
 
-local_version = Brute::VERSION
-gem_name = "brute"
-gemspec = "brute.gemspec"
+local_version = A2A::VERSION
+gem_name = "agent2agent"
+gemspec = "agent2agent.gemspec"
 
 puts "Local version: #{local_version}"
 

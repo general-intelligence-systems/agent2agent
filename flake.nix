@@ -1,5 +1,5 @@
 {
-  description = "brute — Ruby gem";
+  description = "a2a — Ruby gem";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";

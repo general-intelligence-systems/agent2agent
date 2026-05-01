@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../lib/brute/version"
+require_relative "../lib/a2a/version"
 
-version = Brute::VERSION
+version = A2A::VERSION
 tag = "v#{version}"
 
 existing = `git tag -l #{tag}`.strip
