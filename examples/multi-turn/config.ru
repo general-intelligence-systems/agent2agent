@@ -1,34 +1,5 @@
 # frozen_string_literal: true
 
-# Multi-Turn Conversation Agent
-#
-# Demonstrates the INPUT_REQUIRED state for multi-turn interactions:
-#   1. User sends a message with a topic
-#   2. Agent creates a task, transitions to INPUT_REQUIRED asking for confirmation
-#   3. User sends follow-up with the same taskId
-#   4. Agent completes (or re-asks) based on user response
-#
-# This is the A2A equivalent of the .NET ResearcherAgent and the
-# Python Airbnb agent's input_required pattern.
-#
-# Run with:
-#   cd examples/multi-turn && bundle install && bundle exec falcon serve --bind http://0.0.0.0:9292
-#
-# Test multi-turn flow:
-#   # Turn 1: start a research task
-#   curl -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
-#       "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Research quantum computing"}]}
-#     }}'
-#
-#   # Turn 2: confirm (use the taskId from turn 1)
-#   curl -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
-#       "message":{"messageId":"m2","role":"ROLE_USER","taskId":"TASK_ID_HERE","parts":[{"text":"go ahead"}]}
-#     }}'
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

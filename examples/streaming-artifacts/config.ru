@@ -1,24 +1,5 @@
 # frozen_string_literal: true
 
-# Streaming Artifacts Agent
-#
-# Demonstrates chunked artifact streaming with append/lastChunk semantics:
-#   - Multiple artifacts per stream (one per "file")
-#   - Each artifact sent in multiple chunks (append: true/false, lastChunk: true/false)
-#   - Interleaved status updates and artifact updates
-#
-# Inspired by the .NET StreamingArtifactAgent and the JS Coder Agent.
-#
-# Run with:
-#   cd examples/streaming-artifacts && bundle install && bundle exec falcon serve --bind http://0.0.0.0:9292
-#
-# Test streaming:
-#   curl -N -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":1,"method":"SendStreamingMessage","params":{
-#       "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Generate a web app"}]}
-#     }}'
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

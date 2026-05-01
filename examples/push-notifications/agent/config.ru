@@ -1,16 +1,5 @@
 # frozen_string_literal: true
 
-# Push Notifications Agent
-#
-# Processes jobs asynchronously and delivers status/artifact updates
-# via webhooks to registered push notification configs.
-#
-# Pair with the receiver service (receiver/config.ru) to see
-# end-to-end webhook delivery.
-#
-# Run with:
-#   cd examples/push-notifications && docker compose up --build
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

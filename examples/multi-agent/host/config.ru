@@ -1,18 +1,5 @@
 # frozen_string_literal: true
 
-# Host Agent — Multi-Agent Orchestrator
-#
-# Discovers remote agents via A2A::Client, uses Brute (LLM-powered) to
-# decide which agent to delegate to, and forwards the request.
-#
-# This is the A2A equivalent of the Python airbnb-planner host agent
-# and the JS movie-research CLI client — but running as an A2A server itself.
-#
-# Runs on port 9294 inside Docker (http://host:9294).
-# Connects to:
-#   - Greeter Agent at http://greeter:9292
-#   - Translator Agent at http://translator:9293
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

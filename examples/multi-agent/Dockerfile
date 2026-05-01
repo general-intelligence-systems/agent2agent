@@ -11,10 +11,6 @@ COPY lib/ lib/
 COPY data/ data/
 COPY Gemfile ./Gemfile.gem
 
-# Copy brute gem source (sibling directory)
-COPY ../brute/brute.gemspec ./brute/
-COPY ../brute/lib/ ./brute/lib/
-
 # Copy example
 COPY examples/multi-agent/ ./examples/multi-agent/
 

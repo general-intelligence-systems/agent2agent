@@ -1,38 +1,5 @@
 # frozen_string_literal: true
 
-# Async Jobs Agent
-#
-# Demonstrates non-blocking/async task processing:
-#   1. SendMessage with returnImmediately: true returns SUBMITTED instantly
-#   2. Store::Processor runs the job in a background fiber
-#   3. SubscribeToTask relays live progress via SSE
-#   4. GetTask polls the final result
-#
-# Inspired by the .NET EchoAgentWithTasks (ReturnImmediately mode)
-# and the Python adk-cloud-run agent.
-#
-# Run with:
-#   cd examples/async-jobs && bundle install && bundle exec falcon serve --bind http://0.0.0.0:9292
-#
-# Test async flow:
-#   # 1. Submit a job (returns immediately with SUBMITTED)
-#   curl -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
-#       "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Analyze this dataset"}]},
-#       "configuration":{"returnImmediately":true}
-#     }}'
-#
-#   # 2. Subscribe for live updates (SSE stream)
-#   curl -N -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":2,"method":"SubscribeToTask","params":{"id":"TASK_ID_HERE"}}'
-#
-#   # 3. Or poll for the result
-#   curl -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":3,"method":"GetTask","params":{"id":"TASK_ID_HERE"}}'
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

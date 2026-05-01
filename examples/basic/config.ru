@@ -1,17 +1,5 @@
 # frozen_string_literal: true
 
-# Echo Agent — A2A Rack entry point
-#
-# Run with:
-#   cd example && bundle exec falcon serve --bind http://0.0.0.0:9292
-#
-# Test with:
-#   curl http://localhost:9292/.well-known/agent-card.json
-#
-#   curl -X POST http://localhost:9292/a2a \
-#     -H "Content-Type: application/json" \
-#     -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{}}'
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

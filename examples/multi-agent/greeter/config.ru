@@ -1,12 +1,5 @@
 # frozen_string_literal: true
 
-# Greeter Agent
-#
-# A simple agent that generates creative greetings using Brute (LLM-powered).
-# Part of the multi-agent example demonstrating agent-to-agent orchestration.
-#
-# Runs on port 9292 inside Docker (http://greeter:9292).
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

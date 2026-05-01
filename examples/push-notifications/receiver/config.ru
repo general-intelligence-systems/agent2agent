@@ -1,13 +1,5 @@
 # frozen_string_literal: true
 
-# Webhook Receiver
-#
-# A minimal Rack app that logs incoming push notification webhooks.
-# Pair with the agent service to see end-to-end webhook delivery.
-#
-# Listens on port 9293 inside Docker (http://receiver:9293/webhook).
-# Logs all received webhook payloads to stdout.
-
 require "json"
 require "console"
 

@@ -1,12 +1,5 @@
 # frozen_string_literal: true
 
-# Translator Agent
-#
-# A simple agent that translates text into different languages using Brute (LLM-powered).
-# Part of the multi-agent example demonstrating agent-to-agent orchestration.
-#
-# Runs on port 9293 inside Docker (http://translator:9293).
-
 require "bundler/setup"
 require "scampi"
 require "a2a"

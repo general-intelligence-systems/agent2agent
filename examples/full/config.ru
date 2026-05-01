@@ -1,15 +1,5 @@
 # frozen_string_literal: true
 
-# Full Echo Agent — A2A Rack entry point
-#
-# Demonstrates ALL 11 A2A protocol operations with:
-#   - Falcon-native SSE streaming via Protocol::HTTP::Body::Writable
-#   - SQLite-backed persistent task store
-#   - Async fiber-based concurrency (no threads)
-#
-# Run with:
-#   cd examples/full && bundle install && bundle exec falcon serve --bind http://0.0.0.0:9292
-
 require "bundler/setup"
 require "scampi"
 require "a2a"
