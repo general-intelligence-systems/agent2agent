@@ -1,22 +1,11 @@
 FROM ruby:3.4
 
-RUN apt-get update && \
-    rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-# Copy gem source (changes less often = better layer caching)
-COPY agent2agent.gemspec ./
-COPY lib/ lib/
-COPY data/ data/
-COPY Gemfile ./Gemfile.gem
-
-# Copy example
-COPY examples/full/Gemfile examples/full/config.ru examples/full/falcon.rb ./examples/full/
-
-WORKDIR /app/examples/full
-
+COPY Gemfile ./
 RUN bundle install --jobs 4
+
+COPY . .
 
 EXPOSE 9292
 

@@ -38,6 +38,15 @@ curl -X POST http://localhost:9292/a2a \
   }}'
 ```
 
+The response includes the task ID:
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"task":{"id":"abc-123-...","contextId":"...","status":{"state":"TASK_STATE_SUBMITTED","timestamp":"..."}}}}
+```
+
+> [!WARNING]
+> Replace `TASK_ID_HERE` below with the `id` from the response above.
+
 ### 2. Subscribe for live updates (SSE stream)
 
 ```sh

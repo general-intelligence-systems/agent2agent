@@ -40,12 +40,7 @@ module A2A
 
         env["a2a.body"] = params
 
-        begin
-          @app.call(env)
-        rescue => e
-          Console.error(self) { "#{env["a2a.verb"]} #{env["a2a.path"]} raised #{e.class}: #{e.message}\n#{e.backtrace&.join("\n")}" }
-          return error_response(500, "Internal error")
-        end
+        @app.call(env)
 
         # Check if handler signalled a REST error
         if (err = env["a2a.error"])

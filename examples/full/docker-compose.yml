@@ -1,8 +1,6 @@
 services:
   agent:
-    build:
-      context: ../..
-      dockerfile: examples/full/Dockerfile
+    build: .
     restart: unless-stopped
     ports:
       - 9292:9292

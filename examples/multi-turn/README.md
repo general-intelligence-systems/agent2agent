@@ -35,9 +35,16 @@ curl -X POST http://localhost:9292/a2a \
   }}'
 ```
 
-The agent responds with `INPUT_REQUIRED` and a research plan, asking for confirmation.
+The response includes the task ID and an `INPUT_REQUIRED` state with the agent's research plan:
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"task":{"id":"abc-123-...","contextId":"...","status":{"state":"TASK_STATE_INPUT_REQUIRED","timestamp":"..."}, ...}}}
+```
 
 ### Turn 2: Confirm (use the taskId from turn 1)
+
+> [!WARNING]
+> Replace `TASK_ID_HERE` below with the `id` from the Turn 1 response.
 
 ```sh
 curl -X POST http://localhost:9292/a2a \

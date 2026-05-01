@@ -47,12 +47,7 @@ module A2A
         env["a2a.json_rpc_method"] = method
         env["a2a.body"]            = params
 
-        begin
-          @app.call(env)
-        rescue => e
-          Console.error(self) { "#{method} raised #{e.class}: #{e.message}\n#{e.backtrace&.join("\n")}" }
-          return error_response(id, -32603, "Internal error")
-        end
+        @app.call(env)
 
         # Check if handler signalled a JSON-RPC error
         if (err = env["a2a.error"])

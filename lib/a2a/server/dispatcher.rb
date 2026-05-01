@@ -59,7 +59,7 @@ module A2A
               begin
                 handler.call(env)
               rescue => e
-                Console.error(self) { "Handler #{handler.class.name} raised #{e.class}: #{e.message}\n#{e.backtrace&.join("\n")}" }
+                Console.error(self) { "Handler #{handler.class.name} raised #{e.class}: #{e.message}" }
               end
             end
           end

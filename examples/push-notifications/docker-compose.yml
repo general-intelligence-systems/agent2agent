@@ -1,8 +1,6 @@
 services:
   agent:
-    build:
-      context: ../..
-      dockerfile: examples/push-notifications/Dockerfile.agent
+    build: ./agent
     restart: unless-stopped
     ports:
       - 9292:9292
@@ -10,9 +8,7 @@ services:
       - receiver
 
   receiver:
-    build:
-      context: ../..
-      dockerfile: examples/push-notifications/Dockerfile.receiver
+    build: ./receiver
     restart: unless-stopped
     ports:
       - 9293:9293

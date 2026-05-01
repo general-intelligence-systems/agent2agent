@@ -42,7 +42,16 @@ curl -X POST http://localhost:9292/a2a \
   }}'
 ```
 
+The response includes the task ID:
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"task":{"id":"be85b851-...","contextId":"...","status":{"state":"TASK_STATE_SUBMITTED","timestamp":"..."}}}}
+```
+
 Watch the receiver logs to see webhook deliveries as the task progresses through `WORKING` -> `COMPLETED`.
+
+> [!WARNING]
+> Replace `TASK_ID_HERE` below with the `id` from the response above.
 
 Poll for the final result:
 
@@ -58,9 +67,10 @@ curl -X POST http://localhost:9292/a2a \
 |---|---|
 | `agent/config.ru` | Agent -- async processing, push notification config CRUD, webhook delivery |
 | `agent/falcon.rb` | Falcon config for agent (port 9292) |
+| `agent/Gemfile` | Agent dependencies |
+| `agent/Dockerfile` | Container build for the agent service |
 | `receiver/config.ru` | Webhook receiver -- logs incoming POST payloads |
 | `receiver/falcon.rb` | Falcon config for receiver (port 9293) |
-| `Gemfile` | Shared dependencies |
-| `Dockerfile.agent` | Container build for the agent service |
-| `Dockerfile.receiver` | Container build for the receiver service |
+| `receiver/Gemfile` | Receiver dependencies |
+| `receiver/Dockerfile` | Container build for the receiver service |
 | `docker-compose.yml` | Two-service compose config |

@@ -7,6 +7,6 @@ RUN bundle install --jobs 4
 
 COPY . .
 
-EXPOSE 9292
+EXPOSE 9293
 
 CMD ["bundle", "exec", "falcon", "host"]
