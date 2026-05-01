@@ -23,7 +23,7 @@ module A2A
       # Register a handler object.
       #
       # The handler must respond to:
-      #   #operations -> Array<String>  (e.g. ["SendMessage", "GetTask"])
+      #   #operations -> Array(String)  (e.g. ["SendMessage", "GetTask"])
       #   #call(env)  -> void           (sets env["a2a.result"])
       #
       def register(handler)

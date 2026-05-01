@@ -28,8 +28,8 @@ module A2A
 
       # Deliver a payload to all push notification configs for a task.
       #
-      # @param configs [Array<Hash>] push notification configs
-      # @param payload [Hash] the StreamResponse payload
+      # @parameter configs [Array(Hash)] push notification configs
+      # @parameter payload [Hash] the StreamResponse payload
       #
       def deliver(configs, payload)
         return if configs.nil? || configs.empty?
