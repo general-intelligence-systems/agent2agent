@@ -1,5 +1,7 @@
 # Multi-Agent Orchestration
 
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent)
+
 Three A2A agents communicating via the protocol: an LLM-powered orchestrator discovers remote agents and delegates tasks to the most appropriate one.
 
 ## What you'll learn
@@ -30,7 +32,8 @@ Requires an LLM API key. Set one of:
 ## Step 1: Start all three services
 
 ```sh
-cd examples/multi-agent
+git clone https://github.com/general-intelligence-systems/a2a.git
+cd a2a/examples/multi-agent
 ANTHROPIC_API_KEY=sk-... docker compose up -d --build
 ```
 

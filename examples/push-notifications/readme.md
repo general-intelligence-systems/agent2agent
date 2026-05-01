@@ -1,5 +1,7 @@
 # Push Notifications
 
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications)
+
 Demonstrates asynchronous task processing with webhook-based push notification delivery for status and artifact updates.
 
 ## What you'll learn
@@ -22,7 +24,8 @@ The agent always returns immediately with `SUBMITTED` state. Work runs in a back
 ## Step 1: Start both services
 
 ```sh
-cd examples/push-notifications
+git clone https://github.com/general-intelligence-systems/a2a.git
+cd a2a/examples/push-notifications
 docker compose up -d --build
 ```
 

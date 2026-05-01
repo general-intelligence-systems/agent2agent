@@ -1,5 +1,7 @@
 # Streaming Artifacts
 
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts)
+
 Demonstrates chunked artifact streaming with `append`/`lastChunk` semantics, streaming multiple files as separate artifacts over SSE.
 
 ## What you'll learn
@@ -14,7 +16,8 @@ Demonstrates chunked artifact streaming with `append`/`lastChunk` semantics, str
 ## Step 1: Start the agent
 
 ```sh
-cd examples/streaming-artifacts
+git clone https://github.com/general-intelligence-systems/a2a.git
+cd a2a/examples/streaming-artifacts
 docker compose up -d --build
 ```
 

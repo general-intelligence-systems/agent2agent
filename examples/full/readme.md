@@ -1,5 +1,7 @@
 # Full Echo Agent
 
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full)
+
 Demonstrates all 11 A2A protocol operations in a single agent with Falcon-native SSE streaming and a SQLite-backed persistent task store.
 
 ## What you'll learn
@@ -26,7 +28,8 @@ Key features:
 ## Step 1: Start the agent
 
 ```sh
-cd examples/full
+git clone https://github.com/general-intelligence-systems/a2a.git
+cd a2a/examples/full
 docker compose up -d --build
 ```
 
@@ -310,7 +313,7 @@ Expected output (the echo agent completes tasks instantly, so it's already termi
 }
 ```
 
-This correctly returns an error because the task is already completed. To see a successful cancellation, use the [async-jobs example](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/async-jobs) which has long-running tasks.
+This correctly returns an error because the task is already completed. To see a successful cancellation, use the [async-jobs example](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs) which has long-running tasks.
 
 ## Step 9: Operation 6 -- SubscribeToTask
 
@@ -346,7 +349,7 @@ Expected output:
 }
 ```
 
-To see live SSE subscriptions in action, use the [async-jobs example](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/async-jobs).
+To see live SSE subscriptions in action, use the [async-jobs example](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs).
 
 ## Step 10: Operation 7 -- CreateTaskPushNotificationConfig
 

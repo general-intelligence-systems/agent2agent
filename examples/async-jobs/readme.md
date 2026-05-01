@@ -1,5 +1,7 @@
 # Async Jobs
 
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs)
+
 Demonstrates non-blocking task processing with background fibers, live progress via SSE, and polling.
 
 ## What you'll learn
@@ -14,7 +16,8 @@ Demonstrates non-blocking task processing with background fibers, live progress 
 ## Step 1: Start the agent
 
 ```sh
-cd examples/async-jobs
+git clone https://github.com/general-intelligence-systems/a2a.git
+cd a2a/examples/async-jobs
 docker compose up -d --build
 ```
 

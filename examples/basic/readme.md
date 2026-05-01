@@ -1,5 +1,7 @@
 # Echo Agent
 
+[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic)
+
 A minimal A2A agent that echoes messages back. The simplest starting point for understanding the A2A protocol.
 
 ## What you'll learn
@@ -11,7 +13,8 @@ A minimal A2A agent that echoes messages back. The simplest starting point for u
 ## Step 1: Start the agent
 
 ```sh
-cd examples/basic
+git clone https://github.com/general-intelligence-systems/a2a.git
+cd a2a/examples/basic
 docker compose up -d --build
 ```
 
@@ -75,7 +78,7 @@ Expected output:
 }
 ```
 
-This is a bare-bones echo agent -- it returns an empty response object. See the [full example](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/full) for a complete implementation with all 11 operations.
+This is a bare-bones echo agent -- it returns an empty response object. See the [full example](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full) for a complete implementation with all 11 operations.
 
 ## Step 5: Cleanup
 
