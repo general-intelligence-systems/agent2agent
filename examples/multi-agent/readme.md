@@ -31,7 +31,7 @@ Requires an LLM API key. Set one of:
 
 ## Step 1: Start all three services
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/multi-agent
 ANTHROPIC_API_KEY=sk-... docker compose up -d --build
@@ -39,7 +39,7 @@ ANTHROPIC_API_KEY=sk-... docker compose up -d --build
 
 Replace `sk-...` with your actual API key. If using OpenAI or Gemini, substitute the appropriate env var:
 
-```sh
+```bash
 OPENAI_API_KEY=sk-... docker compose up -d --build
 ```
 
@@ -55,7 +55,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -76,7 +76,7 @@ All three services should be running. The host knows where to find the remote ag
 
 ## Step 3: Send a greeting request (routed to greeter)
 
-```sh
+```bash
 curl -s -X POST http://localhost:9294/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
@@ -137,7 +137,7 @@ The key things to notice:
 
 Check the host logs to see the routing decision:
 
-```sh
+```bash
 docker compose logs host
 ```
 
@@ -154,7 +154,7 @@ host-1  |                | Routing to 'greeter' for: Greet Alice for her birthda
 
 ## Step 4: Send a translation request (routed to translator)
 
-```sh
+```bash
 curl -s -X POST http://localhost:9294/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
@@ -212,7 +212,7 @@ This time the host routed to the **translator** agent. The LLM generates the act
 
 ## Step 5: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 

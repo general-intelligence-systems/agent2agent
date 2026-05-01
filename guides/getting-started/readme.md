@@ -49,7 +49,7 @@ app.register(agent)
 run app
 ```
 
-```sh
+```bash
 bundle exec falcon serve --bind http://0.0.0.0:9292
 ```
 
@@ -63,7 +63,7 @@ The server exposes three endpoint groups automatically:
 
 ## Calling It
 
-```sh
+```bash
 # Discover
 curl http://localhost:9292/.well-known/agent-card.json
 

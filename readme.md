@@ -42,7 +42,7 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 
 ## Development
 
-```sh
+```bash
 bin/setup         # bundle install
 bin/console       # IRB with A2A loaded
 bin/test          # run inline tests (scampi)

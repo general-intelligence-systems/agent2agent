@@ -15,7 +15,7 @@ Demonstrates non-blocking task processing with background fibers, live progress 
 
 ## Step 1: Start the agent
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/async-jobs
 docker compose up -d --build
@@ -31,7 +31,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -46,7 +46,7 @@ agent-1  |                | Async jobs example: returnImmediately + SubscribeToT
 
 ## Step 3: Submit a job (returns immediately)
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
@@ -80,7 +80,7 @@ The response comes back instantly with `TASK_STATE_SUBMITTED`. The work is runni
 
 Replace `TASK_ID_HERE` with the `id` from Step 3:
 
-```sh
+```bash
 curl -N -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SubscribeToTask","params":{"id":"TASK_ID_HERE"}}'
@@ -110,7 +110,7 @@ Press `Ctrl+C` if the stream has already ended.
 
 Alternatively (or after the fact), you can poll for the final result. Replace `TASK_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"GetTask","params":{"id":"TASK_ID_HERE"}}' | jq .
@@ -180,7 +180,7 @@ Expected output:
 
 To test cancellation, submit a new job and cancel it before it finishes. Submit:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":4,"method":"SendMessage","params":{
@@ -191,7 +191,7 @@ curl -s -X POST http://localhost:9292/a2a \
 
 This prints just the task ID. Immediately cancel it (replace `TASK_ID_HERE`):
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":5,"method":"CancelTask","params":{"id":"TASK_ID_HERE"}}' | jq .
@@ -217,7 +217,7 @@ Expected output:
 
 ## Step 7: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 

@@ -27,7 +27,7 @@ Key features:
 
 ## Step 1: Start the agent
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/full
 docker compose up -d --build
@@ -43,7 +43,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -64,7 +64,7 @@ agent-1  |                | Concurrency: Async fibers (no threads)
 
 ## Step 3: Operation 1 -- SendMessage
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
@@ -108,7 +108,7 @@ Expected output:
 
 You can continue an existing task by providing `taskId` in the message. Replace `TASK_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
@@ -140,7 +140,7 @@ This correctly errors because the task from Step 3 is already `COMPLETED` (a ter
 
 ## Step 5: Operation 2 -- SendStreamingMessage
 
-```sh
+```bash
 curl -N -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"SendStreamingMessage","params":{
@@ -169,7 +169,7 @@ Press `Ctrl+C` after the stream ends.
 
 Retrieve a task by ID. Replace `TASK_ID_HERE` with the `id` from Step 3:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":4,"method":"GetTask","params":{"id":"TASK_ID_HERE"}}' | jq .
@@ -205,7 +205,7 @@ Expected output:
 
 You can also truncate history with `historyLength`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":5,"method":"GetTask","params":{"id":"TASK_ID_HERE","historyLength":1}}' | jq .
@@ -215,7 +215,7 @@ This returns only the last message in `history`.
 
 ## Step 7: Operation 4 -- ListTasks
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":6,"method":"ListTasks","params":{}}' | jq .
@@ -257,7 +257,7 @@ Expected output:
 
 ListTasks supports pagination and filtering:
 
-```sh
+```bash
 # Filter by state
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
@@ -273,7 +273,7 @@ curl -s -X POST http://localhost:9292/a2a \
 
 First, create a new task to cancel (we need a non-terminal task, so let's create one via SendMessage and immediately try to cancel -- since this echo agent completes instantly, we'll see the expected error for canceling a completed task):
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":9,"method":"SendMessage","params":{
@@ -283,7 +283,7 @@ curl -s -X POST http://localhost:9292/a2a \
 
 Copy the task ID, then attempt to cancel it (replace `TASK_ID_HERE`):
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":10,"method":"CancelTask","params":{"id":"TASK_ID_HERE"}}' | jq .
@@ -319,7 +319,7 @@ This correctly returns an error because the task is already completed. To see a 
 
 SubscribeToTask requires a non-terminal task. Since this echo agent completes tasks instantly, subscribing to a completed task returns an error:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":11,"method":"SubscribeToTask","params":{"id":"TASK_ID_HERE"}}' | jq .
@@ -355,7 +355,7 @@ To see live SSE subscriptions in action, use the [async-jobs example](https://gi
 
 Register a webhook config on an existing task. Replace `TASK_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":12,"method":"CreateTaskPushNotificationConfig","params":{
@@ -385,7 +385,7 @@ Expected output:
 
 Retrieve a specific config. Replace `TASK_ID_HERE` and `CONFIG_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":13,"method":"GetTaskPushNotificationConfig","params":{
@@ -412,7 +412,7 @@ Expected output:
 
 List all webhook configs for a task. Replace `TASK_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":14,"method":"ListTaskPushNotificationConfigs","params":{
@@ -443,7 +443,7 @@ Expected output:
 
 Remove a webhook config. Replace `TASK_ID_HERE` and `CONFIG_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":15,"method":"DeleteTaskPushNotificationConfig","params":{
@@ -466,7 +466,7 @@ Expected output:
 
 This agent declares `extendedAgentCard: false` in its capabilities. Calling this operation demonstrates proper error handling:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":16,"method":"GetExtendedAgentCard","params":{}}' | jq .
@@ -494,7 +494,7 @@ Expected output:
 
 ## Step 15: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 

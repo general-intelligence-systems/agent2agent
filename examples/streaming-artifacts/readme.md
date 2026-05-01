@@ -15,7 +15,7 @@ Demonstrates chunked artifact streaming with `append`/`lastChunk` semantics, str
 
 ## Step 1: Start the agent
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/streaming-artifacts
 docker compose up -d --build
@@ -31,7 +31,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -46,7 +46,7 @@ agent-1  |                | Streaming artifacts example: chunked files with appe
 
 ## Step 3: Stream generated code files (SSE)
 
-```sh
+```bash
 curl -N -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendStreamingMessage","params":{
@@ -92,7 +92,7 @@ Press `Ctrl+C` after the stream ends.
 
 ## Step 4: Non-streaming fallback (SendMessage)
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
@@ -144,7 +144,7 @@ With `SendMessage`, all 3 files are generated synchronously and returned in a si
 
 ## Step 5: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 

@@ -13,7 +13,7 @@ Demonstrates the `INPUT_REQUIRED` state for multi-turn interactions where the ag
 
 ## Step 1: Start the agent
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/multi-turn
 docker compose up -d --build
@@ -29,7 +29,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -44,7 +44,7 @@ agent-1  |                | Multi-turn example: INPUT_REQUIRED → confirmation 
 
 ## Step 3: Turn 1 -- Send a research topic
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
@@ -106,7 +106,7 @@ The key things to notice:
 
 Replace `TASK_ID_HERE` with the `id` from the Turn 1 response:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
@@ -173,7 +173,7 @@ The key things to notice:
 
 ## Step 5: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 

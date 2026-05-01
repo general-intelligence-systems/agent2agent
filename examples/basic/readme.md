@@ -12,7 +12,7 @@ A minimal A2A agent that echoes messages back. The simplest starting point for u
 
 ## Step 1: Start the agent
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/basic
 docker compose up -d --build
@@ -28,7 +28,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -45,7 +45,7 @@ agent-1  |                | Starting Falcon Host ...
 
 ## Step 3: Fetch the agent card
 
-```sh
+```bash
 curl http://localhost:9292/.well-known/agent-card.json
 ```
 
@@ -62,7 +62,7 @@ Expected output:
 
 ## Step 4: Send a message
 
-```sh
+```bash
 curl -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{}}'
@@ -82,7 +82,7 @@ This is a bare-bones echo agent -- it returns an empty response object. See the 
 
 ## Step 5: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 

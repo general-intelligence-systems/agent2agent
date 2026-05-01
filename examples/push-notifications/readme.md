@@ -23,7 +23,7 @@ The agent always returns immediately with `SUBMITTED` state. Work runs in a back
 
 ## Step 1: Start both services
 
-```sh
+```bash
 git clone https://github.com/general-intelligence-systems/a2a.git
 cd a2a/examples/push-notifications
 docker compose up -d --build
@@ -40,7 +40,7 @@ Expected output:
 
 ## Step 2: Check the logs
 
-```sh
+```bash
 docker compose logs
 ```
 
@@ -61,7 +61,7 @@ Both services should be running. The receiver is waiting for webhook POSTs on po
 
 ## Step 3: Submit a job with an inline push notification config
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
@@ -98,7 +98,7 @@ The response returns immediately with `TASK_STATE_SUBMITTED`. The work is now ru
 
 Wait 2-3 seconds for the background work to complete, then check the receiver logs:
 
-```sh
+```bash
 docker compose logs receiver
 ```
 
@@ -164,7 +164,7 @@ Each webhook includes the `token` you provided (`my-secret-token`) in the `X-A2A
 
 Replace `TASK_ID_HERE` with the `id` from Step 3:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"GetTask","params":{"id":"TASK_ID_HERE"}}' | jq .
@@ -210,7 +210,7 @@ The agent supports the full push notification config lifecycle. These operations
 
 ### Create a push notification config
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"CreateTaskPushNotificationConfig","params":{
@@ -240,7 +240,7 @@ Expected output:
 
 Replace `CONFIG_ID_HERE`:
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":4,"method":"GetTaskPushNotificationConfig","params":{
@@ -265,7 +265,7 @@ Expected output:
 
 ### List all push notification configs for a task
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":5,"method":"ListTaskPushNotificationConfigs","params":{
@@ -299,7 +299,7 @@ Expected output:
 
 ### Delete a push notification config
 
-```sh
+```bash
 curl -s -X POST http://localhost:9292/a2a \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":6,"method":"DeleteTaskPushNotificationConfig","params":{
@@ -320,7 +320,7 @@ Expected output:
 
 ## Step 7: Cleanup
 
-```sh
+```bash
 docker compose down
 ```
 
