@@ -2,6 +2,7 @@
 
 require "bundler/setup"
 require "a2a"
+require "a2a/sse"
 
 module A2A
   module Bindings
@@ -12,9 +13,9 @@ module A2A
     # response with content-type application/a2a+json.
     #
     # Streaming operations:
-    # When the handler sets env["a2a.stream"] to a Queue or Enumerator,
-    # this binding returns a text/event-stream SSE response. Each event
-    # is a bare StreamResponse JSON object in `data:`.
+    # When the handler sets env["a2a.stream"] to an SSE::Stream (which is
+    # a Protocol::HTTP::Body::Readable), Falcon streams it natively —
+    # no wrapping, no #each conversion, true async with backpressure.
     #
     class Rest
       def initialize(app)
@@ -46,9 +47,10 @@ module A2A
           return error_response(err[:http_status] || 400, err[:message], err[:data])
         end
 
-        # Check if handler set up a streaming response
+        # Check if handler set up a streaming response.
+        # The stream is an SSE::Stream (Protocol::HTTP::Body::Readable).
         if (stream = env["a2a.stream"])
-          return streaming_response(stream)
+          return [200, A2A::SSE::Stream.headers, stream]
         end
 
         result = env["a2a.result"]
@@ -69,40 +71,6 @@ module A2A
           [status, { "content-type" => "application/problem+json" },
            [JSON.generate(body)]]
         end
-
-        def streaming_response(stream)
-          body = RestSSEBody.new(stream)
-          [200, {
-            "content-type"  => "text/event-stream",
-            "cache-control" => "no-cache",
-            "connection"    => "keep-alive",
-          }, body]
-        end
-    end
-
-    # Rack response body that reads from a Queue and emits SSE events.
-    # Each event is a bare StreamResponse JSON object in `data:`.
-    class RestSSEBody
-      def initialize(stream)
-        @stream = stream
-      end
-
-      def each(&block)
-        return enum_for(:each) unless block
-
-        loop do
-          event = @stream.pop
-          break if event.nil? # sentinel = stream done
-
-          result = event.respond_to?(:to_h) ? event.to_h : event
-          line = JSON.generate(result)
-          block.call("data: #{line}\n\n")
-        end
-      end
-
-      def close
-        @stream.close if @stream.respond_to?(:close)
-      end
     end
   end
 end

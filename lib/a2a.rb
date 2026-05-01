@@ -17,6 +17,8 @@ require "a2a/schema"
 require "a2a/schema/definition"
 require "a2a/schema/validation_error"
 require "a2a/task_store"
+require "a2a/store"
+require "a2a/sse"
 require "a2a/agent"
 
 require "a2a/server"

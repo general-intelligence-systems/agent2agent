@@ -68,7 +68,7 @@ module A2A
     end
 
     # Execution context for handler blocks.
-    # Provides helper methods so blocks can call store, respond, etc.
+    # Provides helper methods so blocks can call store, respond, stream, etc.
     # directly without holding a reference to the env hash.
     class Context
       def initialize(env)
@@ -93,6 +93,40 @@ module A2A
 
       def respond(result)
         @env["a2a.result"] = result
+      end
+
+      # Create an SSE stream for streaming responses.
+      #
+      # Automatically selects the right stream type based on the binding:
+      #   - JSON-RPC binding -> JsonRpcStream (wraps events in envelopes)
+      #   - REST binding     -> RestStream (bare JSON events)
+      #
+      # The stream is registered on env["a2a.stream"] so the binding
+      # middleware returns it as the Rack body. Falcon streams it natively
+      # via Protocol::HTTP::Body::Writable — no threads, no polling.
+      #
+      # Usage in a handler block:
+      #
+      #   on "SendStreamingMessage" do |request|
+      #     s = stream
+      #     Async do
+      #       s.event({ "task" => { ... } })
+      #       s.event({ "statusUpdate" => { ... } })
+      #       s.finish
+      #     end
+      #   end
+      #
+      def stream
+        require "a2a/sse"
+
+        s = if @env["a2a.json_rpc_id"]
+          A2A::SSE::JsonRpcStream.new(json_rpc_id: @env["a2a.json_rpc_id"])
+        else
+          A2A::SSE::RestStream.new
+        end
+
+        @env["a2a.stream"] = s
+        s
       end
     end
   end
@@ -168,6 +202,42 @@ test do
       agent.handlers.first.call(env)
 
       seen_store.should == store
+    end
+
+    it "creates a JsonRpcStream when JSON-RPC binding is active" do
+      agent = A2A::Agent.new do
+        on "SendStreamingMessage" do |request|
+          s = stream
+          s.is_a?(A2A::SSE::JsonRpcStream).should == true
+        end
+      end
+
+      env = {
+        "a2a.store"       => A2A::TaskStore.new,
+        "a2a.request"     => {},
+        "a2a.json_rpc_id" => 42,
+      }
+      agent.handlers.first.call(env)
+
+      env["a2a.stream"].should.not.be.nil
+      env["a2a.stream"].is_a?(Protocol::HTTP::Body::Readable).should == true
+    end
+
+    it "creates a RestStream when REST binding is active" do
+      agent = A2A::Agent.new do
+        on "SendStreamingMessage" do |request|
+          s = stream
+          s.is_a?(A2A::SSE::RestStream).should == true
+        end
+      end
+
+      env = {
+        "a2a.store"   => A2A::TaskStore.new,
+        "a2a.request" => {},
+      }
+      agent.handlers.first.call(env)
+
+      env["a2a.stream"].should.not.be.nil
     end
   end
 end

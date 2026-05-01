@@ -2,6 +2,7 @@
 
 require "bundler/setup"
 require "a2a"
+require "a2a/sse"
 
 module A2A
   module Bindings
@@ -13,9 +14,10 @@ module A2A
     # a JSON-RPC response envelope.
     #
     # Streaming operations (SendStreamingMessage, SubscribeToTask):
-    # When the handler sets env["a2a.stream"] to a Queue or Enumerator,
-    # this binding returns a text/event-stream SSE response. Each event
-    # is a full JSON-RPC response object wrapped in `data:`.
+    # When the handler sets env["a2a.stream"] to an SSE::Stream (which is
+    # a Protocol::HTTP::Body::Writable, which is a Readable), Falcon's
+    # protocol-rack passes it through untouched. True async streaming
+    # with backpressure — no Thread::Queue, no #each polling.
     #
     class JsonRpc
       def initialize(app)
@@ -52,9 +54,10 @@ module A2A
           return error_response(id, err[:code], err[:message], err[:data])
         end
 
-        # Check if handler set up a streaming response
+        # Check if handler set up a streaming response.
+        # The stream is an SSE::Stream (Protocol::HTTP::Body::Readable).
         if (stream = env["a2a.stream"])
-          return streaming_response(id, stream)
+          return [200, A2A::SSE::Stream.headers, stream]
         end
 
         result = env["a2a.result"]
@@ -75,42 +78,6 @@ module A2A
           [200, { "content-type" => "application/json" },
            [JSON.generate(jsonrpc: "2.0", id: id, error: err)]]
         end
-
-        def streaming_response(id, stream)
-          body = SSEBody.new(id, stream)
-          [200, {
-            "content-type"  => "text/event-stream",
-            "cache-control" => "no-cache",
-            "connection"    => "keep-alive",
-          }, body]
-        end
-    end
-
-    # Rack response body that reads from a Queue and emits SSE events.
-    # Each event is a JSON-RPC 2.0 response wrapped in `data:`.
-    # The stream ends when a nil sentinel is received from the queue.
-    class SSEBody
-      def initialize(json_rpc_id, stream)
-        @json_rpc_id = json_rpc_id
-        @stream      = stream
-      end
-
-      def each(&block)
-        return enum_for(:each) unless block
-
-        loop do
-          event = @stream.pop
-          break if event.nil? # sentinel = stream done
-
-          result = event.respond_to?(:to_h) ? event.to_h : event
-          line = JSON.generate(jsonrpc: "2.0", id: @json_rpc_id, result: result)
-          block.call("data: #{line}\n\n")
-        end
-      end
-
-      def close
-        @stream.close if @stream.respond_to?(:close)
-      end
     end
   end
 end

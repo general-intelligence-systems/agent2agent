@@ -11,17 +11,17 @@ Gem::Specification.new do |spec|
   spec.license       = 'MIT'
   spec.required_ruby_version = '>= 3.4'
 
-  spec.files         = Dir['lib/**/*.rb', 'lib/**/*.txt']
+  spec.files         = Dir['lib/**/*.rb', 'lib/**/*.txt', 'data/**/*']
   spec.require_paths = ['lib']
 
   spec.add_dependency 'async'
   spec.add_dependency 'async-http', "~> 0.95"
+  spec.add_dependency 'protocol-http', "~> 0.62"
   spec.add_dependency 'scampi'
-  spec.add_dependency 'activesupport'
   spec.add_dependency 'rack', "~> 3.0"
-  spec.add_dependency "net-http-persistent"
   spec.add_dependency "json_schemer", "~> 2.5"
   spec.add_dependency "google-protobuf", "~> 4.34"
+  spec.add_dependency "sqlite3"
 
   spec.add_development_dependency 'rake', '~> 13.0'
   spec.add_development_dependency 'falcon', '~> 0.55'
