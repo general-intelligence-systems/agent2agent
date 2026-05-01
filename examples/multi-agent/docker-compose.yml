@@ -1,0 +1,83 @@
+# Multi-Agent Example
+#
+# Three A2A agents communicating via the protocol:
+#   - greeter (port 9292): LLM-powered greeting generator
+#   - translator (port 9293): LLM-powered translator
+#   - host (port 9294): Orchestrator that discovers and delegates to the above
+#
+# Requires ANTHROPIC_API_KEY (or other provider key) in the environment.
+#
+# Usage:
+#   ANTHROPIC_API_KEY=sk-... docker compose up --build
+#
+#   # Send a greeting request (routed to greeter)
+#   curl -X POST http://localhost:9294/a2a \
+#     -H "Content-Type: application/json" \
+#     -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
+#       "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Greet Alice for her birthday"}]}
+#     }}'
+#
+#   # Send a translation request (routed to translator)
+#   curl -X POST http://localhost:9294/a2a \
+#     -H "Content-Type: application/json" \
+#     -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
+#       "message":{"messageId":"m2","role":"ROLE_USER","parts":[{"text":"Translate hello to Japanese"}]}
+#     }}'
+#
+# NOTE: This example requires the brute gem from the sibling directory.
+# The Docker build context must include both ../.. (a2a) and ../../../brute.
+# For simplicity, run the services directly instead of via Docker:
+#
+#   cd examples/multi-agent && bundle install
+#   cd greeter && bundle exec falcon serve --bind http://0.0.0.0:9292 &
+#   cd ../translator && bundle exec falcon serve --bind http://0.0.0.0:9293 &
+#   cd ../host && bundle exec falcon serve --bind http://0.0.0.0:9294 &
+
+services:
+  greeter:
+    build:
+      context: ../..
+      dockerfile: examples/multi-agent/Dockerfile
+      args:
+        SERVICE: greeter
+    restart: unless-stopped
+    ports:
+      - 9292:9292
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MODEL=${MODEL:-claude-sonnet-4-20250514}
+
+  translator:
+    build:
+      context: ../..
+      dockerfile: examples/multi-agent/Dockerfile
+      args:
+        SERVICE: translator
+    restart: unless-stopped
+    ports:
+      - 9293:9293
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MODEL=${MODEL:-claude-sonnet-4-20250514}
+
+  host:
+    build:
+      context: ../..
+      dockerfile: examples/multi-agent/Dockerfile
+      args:
+        SERVICE: host
+    restart: unless-stopped
+    ports:
+      - 9294:9294
+    depends_on:
+      - greeter
+      - translator
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MODEL=${MODEL:-claude-sonnet-4-20250514}

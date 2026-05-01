@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    a2a (0.1.0)
+    agent2agent (1.0.0)
       async
       async-http (~> 0.95)
       google-protobuf (~> 4.34)
@@ -153,12 +153,12 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  a2a!
+  agent2agent!
   falcon (~> 0.55)
   rake (~> 13.0)
 
 CHECKSUMS
-  a2a (0.1.0)
+  agent2agent (1.0.0)
   async (2.39.0) sha256=df18730073f2bbb45788077dfa20cb365ecc1b9453969f44de6796b5191a00aa
   async-container (0.34.5) sha256=905d950bb4cc5219238214d3a11ac6c4b74d4affecd930027e929ba0b86234bd
   async-http (0.95.0) sha256=08128cab255a48e41d1e856bfa9cbda001f1c57c88bafa3fa3a545ad795754aa

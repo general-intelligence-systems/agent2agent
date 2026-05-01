@@ -1,0 +1,8 @@
+services:
+  agent:
+    build:
+      context: ../..
+      dockerfile: examples/multi-turn/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 9292:9292

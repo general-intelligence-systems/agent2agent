@@ -1,0 +1,25 @@
+FROM ruby:3.4
+
+RUN apt-get update && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy gem source
+COPY a2a.gemspec ./
+COPY lib/ lib/
+COPY data/ data/
+COPY Gemfile ./Gemfile.gem
+
+# Copy shared Gemfile and agent files
+COPY examples/push-notifications/Gemfile ./examples/push-notifications/
+COPY examples/push-notifications/agent/ ./examples/push-notifications/agent/
+
+WORKDIR /app/examples/push-notifications/agent
+
+# Symlink to shared Gemfile
+RUN ln -sf ../Gemfile Gemfile && bundle install --jobs 4
+
+EXPOSE 9292
+
+CMD ["bundle", "exec", "falcon", "host"]

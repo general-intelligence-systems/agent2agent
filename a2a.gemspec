@@ -3,13 +3,13 @@
 require_relative 'lib/a2a/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = 'a2a'
+  spec.name          = 'agent2agent'
   spec.version       = A2A::VERSION
   spec.authors       = ['A2A Contributors']
   spec.summary       = 'Agent2Agent protocol'
   spec.description   = 'Abstraction to help work with A2A protocol'
   spec.license       = 'MIT'
-  spec.required_ruby_version = '>= 3.4'
+  spec.required_ruby_version = '>= 3.2'
 
   spec.files         = Dir['lib/**/*.rb', 'lib/**/*.txt', 'data/**/*']
   spec.require_paths = ['lib']
