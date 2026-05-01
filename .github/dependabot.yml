@@ -5,7 +5,11 @@
 
 version: 2
 updates:
-  - package-ecosystem: "ruby" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "bundler"
+    directory: "/" # Location of Gemfile
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    # Optionally, you can specify allowed version updates:
+    # allow:
+    #   - dependency-type: "all"
