@@ -48,6 +48,7 @@ module A2A
 
         response = post("/", body, "application/json")
         parsed = JSON.parse(response)
+
         Console.info(self) { "Client result: #{parsed}" }
 
         if (error = parsed["error"])
@@ -77,6 +78,7 @@ module A2A
           )
           result = response.read
           internet.close
+          Console.info(self) { "Agent responded: #{result}" }
           result
         end.wait
       end
