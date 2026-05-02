@@ -31,7 +31,7 @@ module A2A
       method_name = op.name.gsub(/([A-Z])/) { "_#{$1.downcase}" }.sub(/^_/, "")
 
       define_method(method_name) do |params = {}|
-        Console.info(self) { "#{op.name}: #{params}" }
+        Console.info(self) { "Client #{op.name}: #{params}" }
         json_rpc(op.name, params)
       end
     end
@@ -48,6 +48,7 @@ module A2A
 
         response = post("/", body, "application/json")
         parsed = JSON.parse(response)
+        Console.info(self) { "Client result: #{parsed}" }
 
         if (error = parsed["error"])
           raise "JSON-RPC error #{error["code"]}: #{error["message"]}"
