@@ -34,6 +34,8 @@ module A2A
       end
 
       def call(env)
+        Console.info(self) { "Dispatching: #{env}" }
+
         operation = env["a2a.operation"]
 
         if operation

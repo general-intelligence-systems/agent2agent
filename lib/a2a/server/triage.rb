@@ -29,6 +29,7 @@ module A2A
       end
 
       def call(env)
+        Console.info(self) { "Triaging: #{env}" }
         op = resolve_operation(env)
 
         unless op
