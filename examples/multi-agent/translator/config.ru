@@ -83,7 +83,7 @@ agent = A2A::Agent.new do
       env = llm.call(session)
       response_text = session.last&.content || text
     rescue => e
-      Console.error(self) { "LLM call failed: #{e.message}" }
+      Console.error(self, "LLM call failed", e)
       response_text = "[Translation unavailable] #{text}"
     end
 

@@ -100,7 +100,7 @@ agent = A2A::Agent.new do
         remote_cards[name] = client.agent_card
         Console.info(self) { "Discovered agent: #{remote_cards[name]["name"]} at #{url}" }
       rescue => e
-        Console.warn(self) { "Failed to discover #{name} at #{url}: #{e.message}" }
+        Console.warn(self, "Failed to discover #{name} at #{url}", e)
       end
     end
 
@@ -128,7 +128,7 @@ agent = A2A::Agent.new do
       choice = session.last&.content&.strip&.downcase || "none"
       chosen_agent = choice if remote_cards.key?(choice)
     rescue => e
-      Console.error(self) { "Router LLM failed: #{e.message}" }
+      Console.error(self, "Router LLM failed", e)
     end
 
     if chosen_agent.nil?
@@ -192,7 +192,7 @@ agent = A2A::Agent.new do
       })
       store.complete(task_id, nil)
     rescue => e
-      Console.error(self) { "Delegation to #{chosen_agent} failed: #{e.message}" }
+      Console.error(self, "Delegation to #{chosen_agent} failed", e)
 
       artifact = {
         "artifactId" => SecureRandom.uuid,

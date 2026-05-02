@@ -14,17 +14,19 @@ schema-validation:
   order: 7
 protocol-operations:
   order: 8
-examples-basic:
+tracing:
   order: 9
-examples-multi-turn:
+examples-basic:
   order: 10
-examples-async-jobs:
+examples-multi-turn:
   order: 11
-examples-streaming:
+examples-async-jobs:
   order: 12
-examples-push-notifications:
+examples-streaming:
   order: 13
-examples-multi-agent:
+examples-push-notifications:
   order: 14
-examples-full:
+examples-multi-agent:
   order: 15
+examples-full:
+  order: 16

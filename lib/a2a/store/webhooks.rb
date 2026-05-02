@@ -38,7 +38,7 @@ module A2A
           Async do
             deliver_single(config, payload)
           rescue => e
-            Console.error(self) { "Webhook delivery failed for #{config["url"]}: #{e.message}" }
+            Console.error(self, "Webhook delivery failed for #{config["url"]}", e)
           end
         end
       end

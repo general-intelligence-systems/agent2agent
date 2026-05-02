@@ -83,7 +83,7 @@ agent = A2A::Agent.new do
       env = llm.call(session)
       response_text = session.last&.content || "Hello there!"
     rescue => e
-      Console.error(self) { "LLM call failed: #{e.message}" }
+      Console.error(self, "LLM call failed", e)
       response_text = "Hello! (LLM unavailable, but greetings from the Greeter Agent!)"
     end
 

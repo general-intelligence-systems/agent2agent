@@ -55,7 +55,7 @@ module A2A
           @complete_count += 1
         rescue => error
           @failed_count += 1
-          Console.error(self) { "Background task failed: #{error.message}" }
+          Console.error(self, "Background task failed", error)
         ensure
           @call_count -= 1
         end

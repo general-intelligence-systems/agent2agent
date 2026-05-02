@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
     "documentation_uri" => "https://general-intelligence-systems.github.io/agent2agent/",
   }
 
-  spec.files         = Dir['lib/**/*.rb', 'lib/**/*.txt', 'data/**/*']
+  spec.files         = Dir['lib/**/*.rb', 'lib/**/*.txt', 'data/**/*', 'config/**/*.rb']
   spec.require_paths = ['lib']
 
   spec.add_dependency 'async'
