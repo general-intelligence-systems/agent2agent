@@ -2,6 +2,7 @@
 
 require "bundler/setup"
 require "a2a"
+require "console"
 
 module A2A
   # Async-HTTP based A2A protocol client.
@@ -30,7 +31,7 @@ module A2A
       method_name = op.name.gsub(/([A-Z])/) { "_#{$1.downcase}" }.sub(/^_/, "")
 
       define_method(method_name) do |params = {}|
-        Console.log(self) { "#{op.name}: #{params}" }
+        Console.info(self) { "#{op.name}: #{params}" }
         json_rpc(op.name, params)
       end
     end
