@@ -133,7 +133,7 @@ agent = A2A::Agent.new do
       processor.call(&do_work)
 
       task = store.get(task_id)
-      respond A2A::Schema["Send Message Response"].new(
+      A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
           "contextId" => task[:context_id],
@@ -145,7 +145,7 @@ agent = A2A::Agent.new do
       do_work.call
 
       task = store.get(task_id)
-      respond A2A::Schema["Send Message Response"].new(
+      A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
           "contextId" => task[:context_id],
@@ -166,25 +166,11 @@ agent = A2A::Agent.new do
   on "SubscribeToTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
-
-    if terminal_states.include?(task[:state])
-      respond nil
-      @env["a2a.error"] = { code: -32004, message: "Cannot subscribe to a task in a terminal state", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id, "state" => task[:state] } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
+    raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
 
     sub_queue = store.subscribe(id)
-    unless sub_queue
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found" }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless sub_queue
 
     s = stream
 
@@ -226,12 +212,7 @@ agent = A2A::Agent.new do
   on "GetTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
 
     history = task[:history]
     if request.respond_to?(:history_length) && request.history_length
@@ -247,30 +228,20 @@ agent = A2A::Agent.new do
     }
     result["history"] = history if history
 
-    respond A2A::Schema["Task"].new(result)
+    A2A::Schema["Task"].new(result)
   end
 
   # ── CancelTask ──────────────────────────────────────────────────────
   on "CancelTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
-
-    if terminal_states.include?(task[:state])
-      respond nil
-      @env["a2a.error"] = { code: -32002, message: "Task is not cancelable", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_CANCELABLE", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id, "state" => task[:state] } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
+    raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if terminal_states.include?(task[:state])
 
     store.cancel(id)
     task = store.get(id)
 
-    respond A2A::Schema["Task"].new(
+    A2A::Schema["Task"].new(
       id:         task[:id],
       context_id: task[:context_id],
       status:     { "state" => task[:state], "timestamp" => task[:updated_at] },

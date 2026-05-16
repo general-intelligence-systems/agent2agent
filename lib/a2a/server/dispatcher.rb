@@ -62,6 +62,7 @@ module A2A
                 handler.call(env)
               rescue => e
                 Console.error(self, "Handler #{handler.class.name} raised #{e.class}", e)
+                env["a2a.error"] = { code: -32603, http_status: 500, message: "Internal error" }
               end
             end
           end
@@ -110,6 +111,21 @@ test do
       env = { "a2a.operation" => "SendMessage" }
       dispatcher.call(env)
       results.length.should == 1
+    end
+
+    it "sets internal error on env when a handler raises unexpectedly" do
+      bad_handler = Object.new
+      bad_handler.define_singleton_method(:operations) { ["SendMessage"] }
+      bad_handler.define_singleton_method(:call) { |_| raise "boom" }
+
+      dispatcher = A2A::Server::Dispatcher.new
+      dispatcher.register(bad_handler)
+
+      env = { "a2a.operation" => "SendMessage" }
+      dispatcher.call(env)
+      env["a2a.error"][:code].should == -32603
+      env["a2a.error"][:http_status].should == 500
+      env["a2a.error"][:message].should == "Internal error"
     end
 
     it "dispatches to multiple operations from one handler" do

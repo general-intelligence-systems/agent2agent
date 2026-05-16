@@ -12,6 +12,7 @@ require "rack"
 module A2A
 end
 
+require "a2a/errors"
 require "a2a/proto"
 require "a2a/schema"
 require "a2a/schema/definition"

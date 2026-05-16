@@ -230,7 +230,7 @@ agent = A2A::Agent.new do
     store.complete(task_id, nil)
 
     task = store.get(task_id)
-    respond A2A::Schema["Send Message Response"].new(
+    A2A::Schema["Send Message Response"].new(
       task: {
         "id"        => task[:id],
         "contextId" => task[:context_id],
@@ -245,14 +245,9 @@ agent = A2A::Agent.new do
   on "GetTask" do |request|
     id = request.id
     task = store.get(id)
+    raise A2A::TaskNotFoundError.new(id) unless task
 
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
-
-    respond A2A::Schema["Task"].new(
+    A2A::Schema["Task"].new(
       id:         task[:id],
       context_id: task[:context_id],
       status:     { "state" => task[:state], "timestamp" => task[:updated_at] },

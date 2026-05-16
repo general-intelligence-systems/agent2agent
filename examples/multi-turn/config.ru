@@ -80,23 +80,9 @@ agent = A2A::Agent.new do
       # ── Continuation: user is responding to INPUT_REQUIRED ──────────
 
       existing = store.get(task_id)
-      unless existing
-        respond nil
-        @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id } }] }
-        next
-      end
-
-      if terminal_states.include?(existing[:state])
-        respond nil
-        @env["a2a.error"] = { code: -32004, message: "Task is in a terminal state", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org" }] }
-        next
-      end
-
-      unless existing[:state] == "TASK_STATE_INPUT_REQUIRED"
-        respond nil
-        @env["a2a.error"] = { code: -32004, message: "Task is not awaiting input", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org" }] }
-        next
-      end
+      raise A2A::TaskNotFoundError.new(task_id) unless existing
+      raise A2A::UnsupportedOperationError.new(message: "Task is in a terminal state") if terminal_states.include?(existing[:state])
+      raise A2A::UnsupportedOperationError.new(message: "Task is not awaiting input") unless existing[:state] == "TASK_STATE_INPUT_REQUIRED"
 
       # Record the user's follow-up message
       store.add_message(task_id, {
@@ -128,7 +114,7 @@ agent = A2A::Agent.new do
         store.complete(task_id, nil)
 
         task = store.get(task_id)
-        respond A2A::Schema["Send Message Response"].new(
+        A2A::Schema["Send Message Response"].new(
           task: {
             "id"        => task[:id],
             "contextId" => task[:context_id],
@@ -150,7 +136,7 @@ agent = A2A::Agent.new do
         store.update_state(task_id, "TASK_STATE_INPUT_REQUIRED", message: agent_msg)
 
         task = store.get(task_id)
-        respond A2A::Schema["Send Message Response"].new(
+        A2A::Schema["Send Message Response"].new(
           task: {
             "id"        => task[:id],
             "contextId" => task[:context_id],
@@ -187,7 +173,7 @@ agent = A2A::Agent.new do
       store.update_state(task_id, "TASK_STATE_INPUT_REQUIRED", message: agent_msg)
 
       task = store.get(task_id)
-      respond A2A::Schema["Send Message Response"].new(
+      A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
           "contextId" => task[:context_id],
@@ -206,12 +192,7 @@ agent = A2A::Agent.new do
   on "GetTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
 
     history = task[:history]
     if request.respond_to?(:history_length) && request.history_length
@@ -227,7 +208,7 @@ agent = A2A::Agent.new do
     }
     result["history"] = history if history
 
-    respond A2A::Schema["Task"].new(result)
+    A2A::Schema["Task"].new(result)
   end
 end
 

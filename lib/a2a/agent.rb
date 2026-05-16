@@ -63,7 +63,28 @@ module A2A
       end
 
       def call(env)
-        Context.new(env).execute(&@block)
+        result = Context.new(env).execute(&@block)
+
+        # Return-value semantics: if the block returned a Schema object,
+        # use it as the result (unless a stream was set up).
+        if result.is_a?(A2A::Schema::Definition) && !env["a2a.stream"]
+          env["a2a.result"] = result
+        end
+
+      rescue A2A::TaskNotFoundError => e
+        env["a2a.error"] = e.to_h
+
+      rescue A2A::TaskNotCancelableError => e
+        env["a2a.error"] = e.to_h
+
+      rescue A2A::UnsupportedOperationError => e
+        env["a2a.error"] = e.to_h
+
+      rescue A2A::InvalidParamsError => e
+        env["a2a.error"] = e.to_h
+
+      rescue A2A::PushNotificationConfigNotFoundError => e
+        env["a2a.error"] = e.to_h
       end
     end
 
@@ -238,6 +259,156 @@ test do
       agent.handlers.first.call(env)
 
       env["a2a.stream"].should.not.be.nil
+    end
+
+    # ── Return-value semantics ──────────────────────────────────────────
+
+    it "captures a Schema::Definition return value as the result" do
+      schema_obj = A2A::Schema["Task"].new(
+        "id"        => "t-1",
+        "contextId" => "c-1",
+        "status"    => { "state" => "TASK_STATE_COMPLETED", "timestamp" => "2025-01-01T00:00:00.000Z" },
+      )
+
+      agent = A2A::Agent.new do
+        on "GetTask" do |request|
+          schema_obj
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.result"].should == schema_obj
+    end
+
+    it "does not override result when stream is set" do
+      agent = A2A::Agent.new do
+        on "SendStreamingMessage" do |request|
+          s = stream
+          A2A::Schema["Task"].new(
+            "id" => "t-1", "contextId" => "c-1",
+            "status" => { "state" => "TASK_STATE_COMPLETED", "timestamp" => "2025-01-01T00:00:00.000Z" },
+          )
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.result"].should.be.nil
+      env["a2a.stream"].should.not.be.nil
+    end
+
+    it "ignores non-Schema return values" do
+      agent = A2A::Agent.new do
+        on "SendMessage" do |request|
+          { "raw" => "hash" }
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.result"].should.be.nil
+    end
+
+    it "respond still works for backward compatibility" do
+      agent = A2A::Agent.new do
+        on "SendMessage" do |request|
+          respond({ "echo" => true })
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.result"].should == { "echo" => true }
+    end
+
+    # ── Error rescue ────────────────────────────────────────────────────
+
+    it "rescues TaskNotFoundError and sets env error" do
+      agent = A2A::Agent.new do
+        on "GetTask" do |request|
+          raise A2A::TaskNotFoundError.new("task-abc")
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.error"][:code].should == -32001
+      env["a2a.error"][:http_status].should == 404
+      env["a2a.error"][:message].should == "Task not found"
+      env["a2a.error"][:data].first["reason"].should == "TASK_NOT_FOUND"
+    end
+
+    it "rescues TaskNotCancelableError and sets env error" do
+      agent = A2A::Agent.new do
+        on "CancelTask" do |request|
+          raise A2A::TaskNotCancelableError.new("task-abc", state: "TASK_STATE_COMPLETED")
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.error"][:code].should == -32002
+      env["a2a.error"][:http_status].should == 409
+    end
+
+    it "rescues UnsupportedOperationError and sets env error" do
+      agent = A2A::Agent.new do
+        on "GetExtendedAgentCard" do |request|
+          raise A2A::UnsupportedOperationError.new(message: "Not supported")
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.error"][:code].should == -32004
+    end
+
+    it "rescues InvalidParamsError and sets env error" do
+      agent = A2A::Agent.new do
+        on "SendMessage" do |request|
+          raise A2A::InvalidParamsError.new("topic is required")
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.error"][:code].should == -32602
+      env["a2a.error"][:http_status].should == 422
+    end
+
+    it "rescues PushNotificationConfigNotFoundError and sets env error" do
+      agent = A2A::Agent.new do
+        on "GetTaskPushNotificationConfig" do |request|
+          raise A2A::PushNotificationConfigNotFoundError.new("task-abc", "config-123")
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      agent.handlers.first.call(env)
+
+      env["a2a.error"][:code].should == -32001
+      env["a2a.error"][:http_status].should == 404
+      env["a2a.error"][:data].first["metadata"]["configId"].should == "config-123"
+    end
+
+    it "does not rescue non-A2A errors (they propagate)" do
+      agent = A2A::Agent.new do
+        on "SendMessage" do |request|
+          raise RuntimeError, "unexpected bug"
+        end
+      end
+
+      env = { "a2a.store" => A2A::TaskStore.new, "a2a.request" => {} }
+      lambda { agent.handlers.first.call(env) }.should.raise(RuntimeError)
     end
   end
 end

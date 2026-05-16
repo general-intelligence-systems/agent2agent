@@ -130,7 +130,7 @@ agent = A2A::Agent.new do
 
     # Return immediately with SUBMITTED state
     task = store.get(task_id)
-    respond A2A::Schema["Send Message Response"].new(
+    A2A::Schema["Send Message Response"].new(
       task: {
         "id"        => task[:id],
         "contextId" => task[:context_id],
@@ -143,14 +143,9 @@ agent = A2A::Agent.new do
   on "GetTask" do |request|
     id = request.id
     task = store.get(id)
+    raise A2A::TaskNotFoundError.new(id) unless task
 
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
-
-    respond A2A::Schema["Task"].new(
+    A2A::Schema["Task"].new(
       id:         task[:id],
       context_id: task[:context_id],
       status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
@@ -164,19 +159,14 @@ agent = A2A::Agent.new do
   on "CreateTaskPushNotificationConfig" do |request|
     task_id = request.respond_to?(:task_id) ? request.task_id : request.to_h["taskId"]
     task = store.get(task_id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id.to_s } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
     config_data = request.to_h
     config_data.delete("taskId")
     config_data.delete("tenant")
 
     result = store.create_push_config(task_id, config_data)
-    respond A2A::Schema["Task Push Notification Config"].new(result)
+    A2A::Schema["Task Push Notification Config"].new(result)
   end
 
   on "GetTaskPushNotificationConfig" do |request|
@@ -184,34 +174,21 @@ agent = A2A::Agent.new do
     config_id = request.id
 
     task = store.get(task_id)
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found" }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
     config = store.get_push_config(task_id, config_id)
-    unless config
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Push notification config not found" }
-      next
-    end
+    raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
-    respond A2A::Schema["Task Push Notification Config"].new(config)
+    A2A::Schema["Task Push Notification Config"].new(config)
   end
 
   on "ListTaskPushNotificationConfigs" do |request|
     task_id = request.respond_to?(:task_id) ? request.task_id : request.to_h["taskId"]
     task = store.get(task_id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found" }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
     configs = store.list_push_configs(task_id)
-    respond A2A::Schema["List Task Push Notification Configs Response"].new(
+    A2A::Schema["List Task Push Notification Configs Response"].new(
       configs:         configs,
       next_page_token: "",
     )
@@ -222,14 +199,10 @@ agent = A2A::Agent.new do
     config_id = request.id
 
     task = store.get(task_id)
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found" }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
     store.delete_push_config(task_id, config_id)
-    respond nil
+    nil
   end
 end
 

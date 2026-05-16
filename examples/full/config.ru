@@ -47,8 +47,6 @@ agent_card = {
   ],
 }
 
-# ─── Helpers ──────────────────────────────────────────────────────────
-
 extract_text = ->(message) {
   parts = message.respond_to?(:parts) ? message.parts : (message["parts"] || [])
   parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
@@ -58,15 +56,10 @@ now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 terminal_states = A2A::Store::SQLite::TERMINAL_STATES
 
-# ─── SQLite-backed store ──────────────────────────────────────────────
-
 sqlite_store = A2A::Store::SQLite.new(path: "echo_agent.db")
-
-# ─── Agent: all 11 operations ────────────────────────────────────────
 
 agent = A2A::Agent.new do
 
-  # ── 1. SendMessage ──────────────────────────────────────────────────
   on "SendMessage" do |request|
     msg = request.message
     text = extract_text.(msg)
@@ -77,24 +70,24 @@ agent = A2A::Agent.new do
     context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
 
     push_config = nil
+
     if request.respond_to?(:configuration) && request.configuration
       cfg = request.configuration
-      pnc = cfg.respond_to?(:task_push_notification_config) ? cfg.task_push_notification_config : (cfg["taskPushNotificationConfig"] || cfg["pushNotificationConfig"])
+
+      if cfg.respond_to?(:task_push_notification_config)
+        pnc = cfg.task_push_notification_config
+      else
+        pnc = (cfg["taskPushNotificationConfig"] || cfg["pushNotificationConfig"])
+      end
+
       push_config = pnc.respond_to?(:to_h) ? pnc.to_h : pnc if pnc
     end
 
     if task_id && !task_id.empty?
       existing = store.get(task_id)
-      unless existing
-        respond nil
-        @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id } }] }
-        next
-      end
-      if terminal_states.include?(existing[:state])
-        respond nil
-        @env["a2a.error"] = { code: -32004, message: "Task is in a terminal state", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org" }] }
-        next
-      end
+      raise A2A::TaskNotFoundError.new(task_id) unless existing
+      raise A2A::UnsupportedOperationError.new(message: "Task is in a terminal state") if terminal_states.include?(existing[:state])
+
       store.add_message(task_id, {
         "messageId" => message_id || SecureRandom.uuid,
         "role"      => "ROLE_USER",
@@ -126,7 +119,7 @@ agent = A2A::Agent.new do
     store.complete(task_id, nil)
     task = store.get(task_id)
 
-    respond A2A::Schema["Send Message Response"].new(
+    A2A::Schema["Send Message Response"].new(
       task: {
         "id"        => task[:id],
         "contextId" => task[:context_id],
@@ -225,12 +218,7 @@ agent = A2A::Agent.new do
   on "GetTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
 
     history = task[:history]
     if request.respond_to?(:history_length) && request.history_length
@@ -246,7 +234,7 @@ agent = A2A::Agent.new do
     }
     result["history"] = history if history
 
-    respond A2A::Schema["Task"].new(result)
+    A2A::Schema["Task"].new(result)
   end
 
   # ── 4. ListTasks ────────────────────────────────────────────────────
@@ -299,7 +287,7 @@ agent = A2A::Agent.new do
       task_h
     end
 
-    respond A2A::Schema["List Tasks Response"].new(
+    A2A::Schema["List Tasks Response"].new(
       tasks:           tasks_json,
       next_page_token: next_token,
       page_size:       page_size,
@@ -311,23 +299,13 @@ agent = A2A::Agent.new do
   on "CancelTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
-
-    if terminal_states.include?(task[:state])
-      respond nil
-      @env["a2a.error"] = { code: -32002, message: "Task is not cancelable", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_CANCELABLE", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id, "state" => task[:state] } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
+    raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if terminal_states.include?(task[:state])
 
     store.cancel(id)
     task = store.get(id)
 
-    respond A2A::Schema["Task"].new(
+    A2A::Schema["Task"].new(
       id:         task[:id],
       context_id: task[:context_id],
       status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
@@ -335,33 +313,17 @@ agent = A2A::Agent.new do
     )
   end
 
-  # ── 6. SubscribeToTask ─────────────────────────────────────────────
-  #
   # SSE stream via Falcon-native async streaming + Async::Queue pub/sub.
   # No threads — pure fiber-based cooperative concurrency.
   #
   on "SubscribeToTask" do |request|
     id = request.id
     task = store.get(id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id.to_s } }] }
-      next
-    end
-
-    if terminal_states.include?(task[:state])
-      respond nil
-      @env["a2a.error"] = { code: -32004, message: "Cannot subscribe to a task in a terminal state", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => id, "state" => task[:state] } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless task
+    raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
 
     sub_queue = store.subscribe(id)
-    unless sub_queue
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found" }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(id) unless sub_queue
 
     # Create the SSE stream — binding-aware
     s = stream
@@ -404,87 +366,81 @@ agent = A2A::Agent.new do
 
   # ── 7. CreateTaskPushNotificationConfig ─────────────────────────────
   on "CreateTaskPushNotificationConfig" do |request|
-    task_id = request.respond_to?(:task_id) ? request.task_id : request.to_h["taskId"]
-    task = store.get(task_id)
-
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id.to_s } }] }
-      next
+    if request.respond_to?(:task_id)
+      task_id = request.task_id
+    else
+      task_id = request.to_h["taskId"]
     end
 
-    config_data = request.to_h
-    config_data.delete("taskId")
-    config_data.delete("tenant")
+    task = store.get(task_id)
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
-    result = store.create_push_config(task_id, config_data)
-    respond A2A::Schema["Task Push Notification Config"].new(result)
+    request.to_h.then do |config_data|
+      config_data.delete("taskId")
+      config_data.delete("tenant")
+
+      store.create_push_config(task_id, config_data).then do |result|
+        A2A::Schema["Task Push Notification Config"].new(result)
+      end
+    end
   end
 
   # ── 8. GetTaskPushNotificationConfig ────────────────────────────────
   on "GetTaskPushNotificationConfig" do |request|
-    task_id   = request.respond_to?(:task_id) ? request.task_id : request.to_h["taskId"]
+    if request.respond_to?(:task_id)
+      task_id = request.task_id
+    else
+      task_id = request.to_h["taskId"]
+    end
+
     config_id = request.id
 
     task = store.get(task_id)
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id.to_s } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
     config = store.get_push_config(task_id, config_id)
-    unless config
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Push notification config not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id.to_s, "configId" => config_id.to_s } }] }
-      next
-    end
+    raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
-    respond A2A::Schema["Task Push Notification Config"].new(config)
+    A2A::Schema["Task Push Notification Config"].new(config)
   end
 
-  # ── 9. ListTaskPushNotificationConfigs ──────────────────────────────
   on "ListTaskPushNotificationConfigs" do |request|
-    task_id = request.respond_to?(:task_id) ? request.task_id : request.to_h["taskId"]
-
-    task = store.get(task_id)
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id.to_s } }] }
-      next
+    if request.respond_to?(:task_id)
+      task_id = request.task_id
+    else
+      task_id = request.to_h["taskId"]
     end
 
-    configs = store.list_push_configs(task_id)
-    respond A2A::Schema["List Task Push Notification Configs Response"].new(
-      configs:         configs,
-      next_page_token: "",
-    )
+    task = store.get(task_id)
+    raise A2A::TaskNotFoundError.new(task_id) unless task
+
+    store.list_push_configs(task_id).then do |configs|
+      A2A::Schema["List Task Push Notification Configs Response"].new(
+        configs:         configs,
+        next_page_token: "",
+      )
+    end
   end
 
   # ── 10. DeleteTaskPushNotificationConfig ────────────────────────────
   on "DeleteTaskPushNotificationConfig" do |request|
-    task_id   = request.respond_to?(:task_id) ? request.task_id : request.to_h["taskId"]
+    if request.respond_to?(:task_id)
+      task_id = request.task_id
+    else
+      task_id = request.to_h["taskId"]
+    end
+
     config_id = request.id
 
     task = store.get(task_id)
-    unless task
-      respond nil
-      @env["a2a.error"] = { code: -32001, message: "Task not found", data: [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "TASK_NOT_FOUND", "domain" => "a2a-protocol.org", "metadata" => { "taskId" => task_id.to_s } }] }
-      next
-    end
+    raise A2A::TaskNotFoundError.new(task_id) unless task
 
     store.delete_push_config(task_id, config_id)
-    respond nil
+    nil
   end
 
-  # ── 11. GetExtendedAgentCard ────────────────────────────────────────
   on "GetExtendedAgentCard" do |request|
-    respond nil
-    @env["a2a.error"] = {
-      code:    -32004,
-      message: "Extended agent card is not supported",
-      data:    [{ "@type" => "type.googleapis.com/google.rpc.ErrorInfo", "reason" => "UNSUPPORTED_OPERATION", "domain" => "a2a-protocol.org" }],
-    }
+    raise A2A::UnsupportedOperationError.new(message: "Extended agent card is not supported")
   end
 end
 
