@@ -45,8 +45,8 @@ agent_card = {
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
-  parts = message.respond_to?(:parts) ? message.parts : (message["parts"] || [])
-  parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
+  parts = message["parts"] || []
+  parts.filter_map { |p| p["text"] }.join("\n")
 }
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
@@ -71,9 +71,9 @@ agent = A2A::Agent.new do
     msg = request.message
     text = extract_text.(msg)
 
-    task_id    = msg.respond_to?(:task_id)    ? msg.task_id    : msg["taskId"]
-    context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
-    message_id = msg.respond_to?(:message_id) ? msg.message_id : msg["messageId"]
+    task_id    = msg["taskId"]
+    context_id = msg["contextId"]
+    message_id = msg["messageId"]
     context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
 
     if task_id && !task_id.empty?
@@ -195,7 +195,7 @@ agent = A2A::Agent.new do
     raise A2A::TaskNotFoundError.new(id) unless task
 
     history = task[:history]
-    if request.respond_to?(:history_length) && request.history_length
+    if request.history_length
       hl = request.history_length.to_i
       history = hl == 0 ? nil : history.last(hl)
     end

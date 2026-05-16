@@ -48,8 +48,8 @@ agent_card = {
 }
 
 extract_text = ->(message) {
-  parts = message.respond_to?(:parts) ? message.parts : (message["parts"] || [])
-  parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
+  parts = message["parts"] || []
+  parts.filter_map { |p| p["text"] }.join("\n")
 }
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
@@ -64,23 +64,17 @@ agent = A2A::Agent.new do
     msg = request.message
     text = extract_text.(msg)
 
-    task_id    = msg.respond_to?(:task_id)    ? msg.task_id    : msg["taskId"]
-    context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
-    message_id = msg.respond_to?(:message_id) ? msg.message_id : msg["messageId"]
+    task_id    = msg["taskId"]
+    context_id = msg["contextId"]
+    message_id = msg["messageId"]
     context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
 
     push_config = nil
 
-    if request.respond_to?(:configuration) && request.configuration
+    if request.configuration
       cfg = request.configuration
-
-      if cfg.respond_to?(:task_push_notification_config)
-        pnc = cfg.task_push_notification_config
-      else
-        pnc = (cfg["taskPushNotificationConfig"] || cfg["pushNotificationConfig"])
-      end
-
-      push_config = pnc.respond_to?(:to_h) ? pnc.to_h : pnc if pnc
+      pnc = cfg["taskPushNotificationConfig"] || cfg["pushNotificationConfig"]
+      push_config = pnc if pnc
     end
 
     if task_id && !task_id.empty?
@@ -139,8 +133,8 @@ agent = A2A::Agent.new do
     msg = request.message
     text = extract_text.(msg)
 
-    context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
-    message_id = msg.respond_to?(:message_id) ? msg.message_id : msg["messageId"]
+    context_id = msg["contextId"]
+    message_id = msg["messageId"]
     context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
     task_id    = SecureRandom.uuid
 
@@ -221,7 +215,7 @@ agent = A2A::Agent.new do
     raise A2A::TaskNotFoundError.new(id) unless task
 
     history = task[:history]
-    if request.respond_to?(:history_length) && request.history_length
+    if request.history_length
       hl = request.history_length.to_i
       history = hl == 0 ? nil : history.last(hl)
     end
@@ -239,13 +233,13 @@ agent = A2A::Agent.new do
 
   # ── 4. ListTasks ────────────────────────────────────────────────────
   on "ListTasks" do |request|
-    context_id = request.respond_to?(:context_id) ? request.context_id : nil
-    status     = request.respond_to?(:status)     ? request.status     : nil
+    context_id = request.context_id
+    status     = request.status
     context_id = nil if context_id.to_s.empty?
     status     = nil if status.to_s.empty?
 
     page_size = 50
-    if request.respond_to?(:page_size) && request.page_size
+    if request.page_size
       ps = request.page_size.to_i
       page_size = [[ps, 1].max, 100].min
     end
@@ -253,7 +247,7 @@ agent = A2A::Agent.new do
     all_tasks = store.list(context_id: context_id, state: status)
     total_size = all_tasks.size
 
-    page_token = request.respond_to?(:page_token) ? request.page_token : nil
+    page_token = request.page_token
     if page_token && !page_token.to_s.empty?
       idx = all_tasks.index { |t| t[:id] == page_token }
       all_tasks = idx ? all_tasks[(idx + 1)..] : []
@@ -262,13 +256,10 @@ agent = A2A::Agent.new do
     page = all_tasks.first(page_size)
     next_token = page.size == page_size && page.size < all_tasks.size ? page.last[:id] : ""
 
-    include_artifacts = false
-    if request.respond_to?(:include_artifacts)
-      include_artifacts = !!request.include_artifacts
-    end
+    include_artifacts = !!request.include_artifacts
 
     history_length = nil
-    if request.respond_to?(:history_length) && request.history_length
+    if request.history_length
       history_length = request.history_length.to_i
     end
 
@@ -366,12 +357,7 @@ agent = A2A::Agent.new do
 
   # ── 7. CreateTaskPushNotificationConfig ─────────────────────────────
   on "CreateTaskPushNotificationConfig" do |request|
-    if request.respond_to?(:task_id)
-      task_id = request.task_id
-    else
-      task_id = request.to_h["taskId"]
-    end
-
+    task_id = request.task_id
     task = store.get(task_id)
     raise A2A::TaskNotFoundError.new(task_id) unless task
 
@@ -387,12 +373,7 @@ agent = A2A::Agent.new do
 
   # ── 8. GetTaskPushNotificationConfig ────────────────────────────────
   on "GetTaskPushNotificationConfig" do |request|
-    if request.respond_to?(:task_id)
-      task_id = request.task_id
-    else
-      task_id = request.to_h["taskId"]
-    end
-
+    task_id   = request.task_id
     config_id = request.id
 
     task = store.get(task_id)
@@ -405,12 +386,7 @@ agent = A2A::Agent.new do
   end
 
   on "ListTaskPushNotificationConfigs" do |request|
-    if request.respond_to?(:task_id)
-      task_id = request.task_id
-    else
-      task_id = request.to_h["taskId"]
-    end
-
+    task_id = request.task_id
     task = store.get(task_id)
     raise A2A::TaskNotFoundError.new(task_id) unless task
 
@@ -424,12 +400,7 @@ agent = A2A::Agent.new do
 
   # ── 10. DeleteTaskPushNotificationConfig ────────────────────────────
   on "DeleteTaskPushNotificationConfig" do |request|
-    if request.respond_to?(:task_id)
-      task_id = request.task_id
-    else
-      task_id = request.to_h["taskId"]
-    end
-
+    task_id   = request.task_id
     config_id = request.id
 
     task = store.get(task_id)

@@ -47,8 +47,8 @@ agent_card = {
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
-  parts = message.respond_to?(:parts) ? message.parts : (message["parts"] || [])
-  parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
+  parts = message["parts"] || []
+  parts.filter_map { |p| p["text"] }.join("\n")
 }
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
@@ -82,23 +82,22 @@ agent = A2A::Agent.new do
     msg = request.message
     text = extract_text.(msg)
 
-    context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
+    context_id = msg["contextId"]
     context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
     task_id    = SecureRandom.uuid
 
     store.create(task_id, context_id)
     store.add_message(task_id, {
-      "messageId" => (msg.respond_to?(:message_id) ? msg.message_id : msg["messageId"]) || SecureRandom.uuid,
+      "messageId" => msg["messageId"] || SecureRandom.uuid,
       "role"      => "ROLE_USER",
       "parts"     => [{ "text" => text }],
     })
 
     # Check for returnImmediately configuration
     return_immediately = false
-    if request.respond_to?(:configuration) && request.configuration
+    if request.configuration
       cfg = request.configuration
-      ri = cfg.respond_to?(:return_immediately) ? cfg.return_immediately : (cfg["returnImmediately"] || cfg["return_immediately"])
-      return_immediately = !!ri
+      return_immediately = !!(cfg["returnImmediately"])
     end
 
     # The actual work — runs either inline or in background
@@ -215,7 +214,7 @@ agent = A2A::Agent.new do
     raise A2A::TaskNotFoundError.new(id) unless task
 
     history = task[:history]
-    if request.respond_to?(:history_length) && request.history_length
+    if request.history_length
       hl = request.history_length.to_i
       history = hl == 0 ? nil : history.last(hl)
     end

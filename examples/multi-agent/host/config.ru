@@ -58,8 +58,8 @@ agent_card = {
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
-  parts = message.respond_to?(:parts) ? message.parts : (message["parts"] || [])
-  parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
+  parts = message["parts"] || []
+  parts.filter_map { |p| p["text"] }.join("\n")
 }
 
 # ─── LLM Router (Brute-powered) ──────────────────────────────────────
@@ -85,7 +85,7 @@ agent = A2A::Agent.new do
     msg = request.message
     text = extract_text.(msg)
 
-    context_id = msg.respond_to?(:context_id) ? msg.context_id : msg["contextId"]
+    context_id = msg["contextId"]
     context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
     task_id    = SecureRandom.uuid
 
