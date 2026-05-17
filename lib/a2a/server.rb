@@ -35,9 +35,8 @@ module A2A
   #   run app
   #
   class Server
-    def initialize(agent_card: {}, store: TaskStore.new)
+    def initialize(agent_card: {})
       @agent_card = agent_card
-      @store      = store
       @dispatcher = Dispatcher.new
       @app        = build_app
     end
@@ -67,11 +66,10 @@ module A2A
         require "a2a/bindings/rest"
 
         agent_card = @agent_card
-        store      = @store
         dispatcher = @dispatcher
 
         Rack::Builder.app do
-          use A2A::Server::Env, agent_card: agent_card, store: store
+          use A2A::Server::Env, agent_card: agent_card
 
           map "/.well-known/agent-card.json" do
             run ->(env) {

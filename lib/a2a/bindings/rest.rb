@@ -40,11 +40,11 @@ module A2A
 
         env["a2a.body"] = params
 
-        @app.call(env)
+        result = @app.call(env)
 
-        # Check if handler signalled a REST error
-        if (err = env["a2a.error"])
-          return error_response(err[:http_status] || 400, err[:message], err[:data])
+        # Check if the result is an error object
+        if result.is_a?(A2A::Error)
+          return error_response(result.http_status, result.message, result.error_data)
         end
 
         # Check if handler set up a streaming response.
@@ -53,7 +53,6 @@ module A2A
           return [200, A2A::SSE::Stream.headers, stream]
         end
 
-        result = env["a2a.result"]
         success_response(result)
       end
 
@@ -76,8 +75,11 @@ module A2A
 end
 
 test do
+  require "a2a/test_helpers"
+
   server = A2A::Server.new(agent_card: { "name" => "Test" })
-  rack   = Rack::MockRequest.new(server)
+  server.register(A2A::TestHelpers.stub_agent)
+  rack = Rack::MockRequest.new(server)
 
   A2A::Proto.operations.each do |op|
     it "#{op.rest_verb.upcase} #{op.rest_path} returns valid #{op.response_type}" do

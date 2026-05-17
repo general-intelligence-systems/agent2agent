@@ -6,133 +6,115 @@ require "a2a"
 
 module A2A
   class Server
-    # Routes incoming A2A operations to registered handler objects.
+    # Routes incoming A2A operations to their registered handler stacks.
     #
-    # Each handler declares the operations it handles via `#operations`.
-    # When an operation arrives, the dispatcher finds all matching handlers
-    # and calls them. Errors in one handler do not prevent others from running.
+    # Each operation maps to exactly one Rack app (a compiled middleware
+    # stack built by the Agent DSL). The Dispatcher is a terminal Rack app
+    # that reads env["a2a.operation"] set by Triage, looks up the matching
+    # route, and calls it.
     #
-    # The Dispatcher is a Rack app (terminal, not middleware). It reads
-    # env["a2a.operation"] set by Triage and fans out to matching handlers.
+    # Returns domain objects (A2A::Schema::Definition or A2A::Error) —
+    # the binding layer is responsible for formatting these into HTTP.
     #
     class Dispatcher
       def initialize
-        @handlers = Hash.new { |h, k| h[k] = [] }
+        @routes = {}
       end
 
       # Register a handler object.
       #
       # The handler must respond to:
       #   #operations -> Array(String)  (e.g. ["SendMessage", "GetTask"])
-      #   #call(env)  -> void           (sets env["a2a.result"])
+      #   #call(env)  -> A2A::Schema::Definition | A2A::Error
       #
       def register(handler)
         handler.operations.each do |op|
-          @handlers[op] << handler
+          @routes[op] = handler
           Console.info(self) { "Registered #{handler.class.name} for #{op}" }
         end
       end
 
       def call(env)
-        Console.info(self) { "Dispatching: #{env}" }
-
         operation = env["a2a.operation"]
+        app = @routes[operation]
 
-        if operation
-          dispatch(operation, env)
+        unless app
+          raise A2A::UnsupportedOperationError.new(
+            message: "Operation not supported: #{operation}"
+          )
         end
 
-        [200, {}, []]
+        app.call(env)
+      rescue A2A::Error => e
+        e
+      rescue => e
+        Console.error(self, "Handler raised #{e.class}: #{e.message}", e)
+        A2A::Error.new("Internal error", code: -32603, http_status: 500)
       end
 
       def handler_count
-        @handlers.values.flatten.size
+        @routes.size
       end
-
-      private
-
-        def dispatch(operation, env)
-          handlers = @handlers[operation]
-
-          if handlers.empty?
-            Console.debug(self) { "No handler for operation: #{operation}" }
-          else
-            handlers.each do |handler|
-              begin
-                handler.call(env)
-              rescue => e
-                Console.error(self, "Handler #{handler.class.name} raised #{e.class}", e)
-                env["a2a.error"] = { code: -32603, http_status: 500, message: "Internal error" }
-              end
-            end
-          end
-        end
     end
   end
 end
 
 test do
   describe "A2A::Server::Dispatcher" do
-    it "registers and dispatches to handlers" do
-      received = []
+    it "registers and dispatches to a handler" do
       handler = Object.new
       handler.define_singleton_method(:operations) { ["SendMessage"] }
-      handler.define_singleton_method(:call) { |env| received << env }
+      handler.define_singleton_method(:call) { |env| :dispatched }
 
       dispatcher = A2A::Server::Dispatcher.new
       dispatcher.register(handler)
       dispatcher.handler_count.should == 1
 
       env = { "a2a.operation" => "SendMessage" }
-      dispatcher.call(env)
-      received.length.should == 1
+      result = dispatcher.call(env)
+      result.should == :dispatched
     end
 
-    it "ignores operations with no matching handler" do
+    it "returns UnsupportedOperationError for unknown operations" do
       dispatcher = A2A::Server::Dispatcher.new
       env = { "a2a.operation" => "UnknownOp" }
-      lambda { dispatcher.call(env) }.should.not.raise
+      result = dispatcher.call(env)
+      result.should.be.is_a(A2A::UnsupportedOperationError)
+      result.code.should == -32004
     end
 
-    it "continues dispatching when a handler raises" do
-      results = []
-      bad_handler = Object.new
-      bad_handler.define_singleton_method(:operations) { ["SendMessage"] }
-      bad_handler.define_singleton_method(:call) { |_| raise "boom" }
-
-      good_handler = Object.new
-      good_handler.define_singleton_method(:operations) { ["SendMessage"] }
-      good_handler.define_singleton_method(:call) { |e| results << e }
+    it "returns A2A::Error when handler raises one" do
+      handler = Object.new
+      handler.define_singleton_method(:operations) { ["SendMessage"] }
+      handler.define_singleton_method(:call) { |_| raise A2A::TaskNotFoundError.new("t-1") }
 
       dispatcher = A2A::Server::Dispatcher.new
-      dispatcher.register(bad_handler)
-      dispatcher.register(good_handler)
+      dispatcher.register(handler)
 
-      env = { "a2a.operation" => "SendMessage" }
-      dispatcher.call(env)
-      results.length.should == 1
+      result = dispatcher.call({ "a2a.operation" => "SendMessage" })
+      result.should.be.is_a(A2A::TaskNotFoundError)
+      result.code.should == -32001
     end
 
-    it "sets internal error on env when a handler raises unexpectedly" do
-      bad_handler = Object.new
-      bad_handler.define_singleton_method(:operations) { ["SendMessage"] }
-      bad_handler.define_singleton_method(:call) { |_| raise "boom" }
+    it "returns internal error when handler raises unexpected exception" do
+      handler = Object.new
+      handler.define_singleton_method(:operations) { ["SendMessage"] }
+      handler.define_singleton_method(:call) { |_| raise "boom" }
 
       dispatcher = A2A::Server::Dispatcher.new
-      dispatcher.register(bad_handler)
+      dispatcher.register(handler)
 
-      env = { "a2a.operation" => "SendMessage" }
-      dispatcher.call(env)
-      env["a2a.error"][:code].should == -32603
-      env["a2a.error"][:http_status].should == 500
-      env["a2a.error"][:message].should == "Internal error"
+      result = dispatcher.call({ "a2a.operation" => "SendMessage" })
+      result.should.be.is_a(A2A::Error)
+      result.code.should == -32603
+      result.http_status.should == 500
     end
 
     it "dispatches to multiple operations from one handler" do
       received = []
       handler = Object.new
       handler.define_singleton_method(:operations) { ["SendMessage", "GetTask"] }
-      handler.define_singleton_method(:call) { |env| received << env["a2a.operation"] }
+      handler.define_singleton_method(:call) { |env| received << env["a2a.operation"]; :ok }
 
       dispatcher = A2A::Server::Dispatcher.new
       dispatcher.register(handler)

@@ -33,7 +33,7 @@ module A2A
         op = resolve_operation(env)
 
         unless op
-          return [404, { "content-type" => "text/plain" }, ["Unknown operation"]]
+          return A2A::UnsupportedOperationError.new(message: "Unknown operation")
         end
 
         env["a2a.operation"]       = op.name
