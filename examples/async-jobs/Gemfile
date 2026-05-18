@@ -1,7 +1,0 @@
-# frozen_string_literal: true
-
-source "https://rubygems.org"
-
-gem "falcon", "~> 0.55"
-gem "scampi"
-gem "agent2agent"

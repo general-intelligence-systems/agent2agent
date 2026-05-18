@@ -18,21 +18,14 @@ REMOTE_AGENTS = {
   "translator" => "http://translator:9293",
 }
 
-# Discover remote agent cards at startup
 remote_cards = {}
 
-# ─── Agent Card ────────────────────────────────────────────────────────
-
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
-
-# ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
   parts = message.parts || []
   parts.filter_map { |p| p.text }.join("\n")
 }
-
-# ─── LLM Router (Brute-powered) ──────────────────────────────────────
 
 router_llm = Brute::Agent.new(
   provider: Brute.provider,
@@ -44,11 +37,7 @@ router_llm = Brute::Agent.new(
   run Brute::Middleware::LLMCall.new
 end
 
-# ─── Store ────────────────────────────────────────────────────────────
-
 sqlite_store = A2A::Store::SQLite.new(path: "host.db")
-
-# ─── Agent ────────────────────────────────────────────────────────────
 
 agent = A2A::Agent.new do
   on "SendMessage" do
@@ -187,7 +176,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
@@ -203,8 +191,6 @@ agent = A2A::Agent.new do
     }
   end
 end
-
-# ─── Boot ──────────────────────────────────────────────────────────────
 
 app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)

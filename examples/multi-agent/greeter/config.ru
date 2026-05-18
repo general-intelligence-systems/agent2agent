@@ -8,18 +8,12 @@ require "console"
 require "securerandom"
 require "yaml"
 
-# ─── Agent Card ────────────────────────────────────────────────────────
-
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
-
-# ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
   parts = message.parts || []
   parts.filter_map { |p| p.text }.join("\n")
 }
-
-# ─── Brute Agent (LLM-powered) ───────────────────────────────────────
 
 llm = Brute::Agent.new(
   provider: Brute.provider,
@@ -31,11 +25,7 @@ llm = Brute::Agent.new(
   run Brute::Middleware::LLMCall.new
 end
 
-# ─── Store ────────────────────────────────────────────────────────────
-
 sqlite_store = A2A::Store::SQLite.new(path: "greeter.db")
-
-# ─── A2A Agent ────────────────────────────────────────────────────────
 
 agent = A2A::Agent.new do
   on "SendMessage" do
@@ -83,8 +73,6 @@ agent = A2A::Agent.new do
     }
   end
 end
-
-# ─── Boot ──────────────────────────────────────────────────────────────
 
 app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)

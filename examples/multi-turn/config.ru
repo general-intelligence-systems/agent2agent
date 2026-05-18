@@ -8,11 +8,7 @@ require "console"
 require "securerandom"
 require "yaml"
 
-# ─── Agent Card ────────────────────────────────────────────────────────
-
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
-
-# ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
   parts = message.parts || []
@@ -23,11 +19,7 @@ now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 terminal_states = A2A::Store::SQLite::TERMINAL_STATES
 
-# ─── SQLite-backed store ─────────────────────────────────────────────
-
 sqlite_store = A2A::Store::SQLite.new(path: "research_planner.db")
-
-# ─── Agent ────────────────────────────────────────────────────────────
 
 agent = A2A::Agent.new do
 
@@ -161,7 +153,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
     use A2A::Middleware::HistoryLength
@@ -181,8 +172,6 @@ agent = A2A::Agent.new do
     }
   end
 end
-
-# ─── Boot ──────────────────────────────────────────────────────────────
 
 app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)
