@@ -10,11 +10,7 @@ require "securerandom"
 require "async"
 require "yaml"
 
-# ─── Agent Card ────────────────────────────────────────────────────────
-
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
-
-# ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
   parts = message.parts || []
@@ -43,16 +39,10 @@ CODE_FILES = {
   ],
 }
 
-# ─── Store ────────────────────────────────────────────────────────────
-
 sqlite_store = A2A::Store::SQLite.new(path: "codegen.db")
-
-# ─── Agent ────────────────────────────────────────────────────────────
 
 agent = A2A::Agent.new do
 
-  # ── SendStreamingMessage ─────────────────────────────────────────────
-  #
   # Streams multiple code files as separate artifacts, each in chunks.
   # Event sequence for each file:
   #   artifactUpdate { append: false, lastChunk: false }  — first chunk
@@ -175,7 +165,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── SendMessage (non-streaming fallback) ─────────────────────────────
   on "SendMessage" do
     respond_with -> (env) {
       request = env["a2a.request"]
@@ -222,7 +211,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
@@ -237,8 +225,6 @@ agent = A2A::Agent.new do
     }
   end
 end
-
-# ─── Boot ──────────────────────────────────────────────────────────────
 
 app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)

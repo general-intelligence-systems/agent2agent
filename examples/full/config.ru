@@ -94,8 +94,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 2. SendStreamingMessage ─────────────────────────────────────────
-  #
   # Returns results as SSE events via Falcon-native async streaming.
   # Uses A2A::SSE::Stream (Protocol::HTTP::Body::Writable) — no threads.
   #
@@ -186,7 +184,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 3. GetTask ──────────────────────────────────────────────────────
   on "GetTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
     use A2A::Middleware::HistoryLength
@@ -206,7 +203,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 4. ListTasks ────────────────────────────────────────────────────
   on "ListTasks" do
     use A2A::Middleware::PageSize
     respond_with -> (env) {
@@ -260,16 +256,14 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 5. CancelTask ──────────────────────────────────────────────────
   on "CancelTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
       task = env["a2a.task"]
-      id   = task[:id]
-      raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if terminal_states.include?(task[:state])
+      raise A2A::TaskNotCancelableError.new(task[:id], state: task[:state]) if terminal_states.include?(task[:state])
 
-      sqlite_store.cancel(id)
-      task = sqlite_store.get(id)
+      sqlite_store.cancel(task[:id])
+      task = sqlite_store.get(task[:id])
 
       A2A::Schema["Task"].new(
         id:         task[:id],
@@ -338,7 +332,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 7. CreateTaskPushNotificationConfig ─────────────────────────────
   on "CreateTaskPushNotificationConfig" do
     use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
@@ -356,7 +349,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 8. GetTaskPushNotificationConfig ────────────────────────────────
   on "GetTaskPushNotificationConfig" do
     use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
@@ -385,7 +377,6 @@ agent = A2A::Agent.new do
     }
   end
 
-  # ── 10. DeleteTaskPushNotificationConfig ────────────────────────────
   on "DeleteTaskPushNotificationConfig" do
     use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
