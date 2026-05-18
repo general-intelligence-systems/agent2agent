@@ -7,7 +7,9 @@ require "a2a"
 client = A2A::Client.new("http://localhost:9292")
 
 created = client.send_message(
-  message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
+  message_id: "msg-1",
+  role: "ROLE_USER",
+  parts: [{ text: "Hello" }]
 )
 task_id = created.task.id
 
@@ -17,6 +19,9 @@ config = client.create_task_push_notification_config(
 )
 config_id = config.id
 
-result = client.get_task_push_notification_config(id: config_id, task_id: task_id)
+result = client.get_task_push_notification_config(
+  id: config_id,
+  task_id: task_id
+)
 
 pp result.to_h

@@ -1,6 +1,8 @@
 services:
   agent:
-    build: ../../examples/full
+    build:
+      context: ../..
+      dockerfile: test/integration/Dockerfile
     restart: unless-stopped
     ports:
       - 9292:9292
