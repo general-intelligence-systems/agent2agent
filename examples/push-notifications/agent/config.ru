@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
-require "scampi"
 require "a2a"
 require "a2a/sse"
 require "a2a/store"
@@ -17,8 +16,8 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
-  parts = message["parts"] || []
-  parts.filter_map { |p| p["text"] }.join("\n")
+  parts = message.parts || []
+  parts.filter_map { |p| p.text }.join("\n")
 }
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
@@ -40,145 +39,163 @@ agent = A2A::Agent.new do
   # Push notification configs (inline or CRUD) receive webhook POSTs
   # for each state transition and artifact.
   #
-  on "SendMessage" do |request|
-    msg = request.message
-    text = extract_text.(msg)
+  on "SendMessage" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      msg = request.message
+      text = extract_text.(msg)
 
-    context_id = msg["contextId"]
-    context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
-    task_id    = SecureRandom.uuid
+      context_id = msg.context_id
+      context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
+      task_id    = SecureRandom.uuid
 
-    # Extract inline push notification config from configuration
-    push_config = nil
-    if request.configuration
-      cfg = request.configuration
-      pnc = cfg["taskPushNotificationConfig"] || cfg["pushNotificationConfig"]
-      push_config = pnc if pnc
-    end
+      # Extract inline push notification config from configuration
+      push_config = nil
+      if request.configuration
+        cfg = request.configuration
+        pnc = cfg.task_push_notification_config
+        push_config = pnc if pnc
+      end
 
-    store.create(task_id, context_id, push_config)
-    store.add_message(task_id, {
-      "messageId" => msg["messageId"] || SecureRandom.uuid,
-      "role"      => "ROLE_USER",
-      "parts"     => [{ "text" => text }],
-    })
-
-    # Process in background — each state change triggers webhook delivery
-    # via store.update_state -> store.webhooks.deliver
-    processor.call do
-      store.update_state(task_id, "TASK_STATE_WORKING", message: {
-        "messageId" => SecureRandom.uuid,
-        "role"      => "ROLE_AGENT",
-        "parts"     => [{ "text" => "Starting work on: #{text}" }],
+      sqlite_store.create(task_id, context_id, push_config)
+      sqlite_store.add_message(task_id, {
+        "messageId" => msg.message_id || SecureRandom.uuid,
+        "role"      => "ROLE_USER",
+        "parts"     => [{ "text" => text }],
       })
 
-      sleep 1
+      # Process in background — each state change triggers webhook delivery
+      # via sqlite_store.update_state -> sqlite_store.webhooks.deliver
+      processor.call do
+        sqlite_store.update_state(task_id, "TASK_STATE_WORKING", message: {
+          "messageId" => SecureRandom.uuid,
+          "role"      => "ROLE_AGENT",
+          "parts"     => [{ "text" => "Starting work on: #{text}" }],
+        })
 
-      store.update_state(task_id, "TASK_STATE_WORKING", message: {
-        "messageId" => SecureRandom.uuid,
-        "role"      => "ROLE_AGENT",
-        "parts"     => [{ "text" => "Processing... 50% complete" }],
-      })
+        sleep 1
 
-      sleep 1
+        sqlite_store.update_state(task_id, "TASK_STATE_WORKING", message: {
+          "messageId" => SecureRandom.uuid,
+          "role"      => "ROLE_AGENT",
+          "parts"     => [{ "text" => "Processing... 50% complete" }],
+        })
 
-      artifact = {
-        "artifactId" => SecureRandom.uuid,
-        "name"       => "result",
-        "parts"      => [{ "text" => "Result for: #{text}\n\nProcessed successfully via webhook worker." }],
-      }
-      store.add_artifact(task_id, artifact)
+        sleep 1
 
-      store.add_message(task_id, {
-        "messageId" => SecureRandom.uuid,
-        "role"      => "ROLE_AGENT",
-        "parts"     => [{ "text" => "Work complete." }],
-      })
+        artifact = {
+          "artifactId" => SecureRandom.uuid,
+          "name"       => "result",
+          "parts"      => [{ "text" => "Result for: #{text}\n\nProcessed successfully via webhook worker." }],
+        }
+        sqlite_store.add_artifact(task_id, artifact)
 
-      store.complete(task_id, nil)
-    end
+        sqlite_store.add_message(task_id, {
+          "messageId" => SecureRandom.uuid,
+          "role"      => "ROLE_AGENT",
+          "parts"     => [{ "text" => "Work complete." }],
+        })
 
-    # Return immediately with SUBMITTED state
-    task = store.get(task_id)
-    A2A::Schema["Send Message Response"].new(
-      task: {
-        "id"        => task[:id],
-        "contextId" => task[:context_id],
-        "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-      }
-    )
+        sqlite_store.complete(task_id, nil)
+      end
+
+      # Return immediately with SUBMITTED state
+      task = sqlite_store.get(task_id)
+      A2A::Schema["Send Message Response"].new(
+        task: {
+          "id"        => task[:id],
+          "contextId" => task[:context_id],
+          "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+        }
+      )
+    }
   end
 
   # ── GetTask ──────────────────────────────────────────────────────────
-  on "GetTask" do |request|
-    id = request.id
-    task = store.get(id)
-    raise A2A::TaskNotFoundError.new(id) unless task
+  on "GetTask" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      id = request.id
+      task = sqlite_store.get(id)
+      raise A2A::TaskNotFoundError.new(id) unless task
 
-    A2A::Schema["Task"].new(
-      id:         task[:id],
-      context_id: task[:context_id],
-      status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
-      artifacts:  task[:artifacts],
-      history:    task[:history],
-    )
+      A2A::Schema["Task"].new(
+        id:         task[:id],
+        context_id: task[:context_id],
+        status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
+        artifacts:  task[:artifacts],
+        history:    task[:history],
+      )
+    }
   end
 
   # ── Push Notification Config CRUD ────────────────────────────────────
 
-  on "CreateTaskPushNotificationConfig" do |request|
-    task_id = request.task_id
-    task = store.get(task_id)
-    raise A2A::TaskNotFoundError.new(task_id) unless task
+  on "CreateTaskPushNotificationConfig" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      task_id = request.task_id
+      task = sqlite_store.get(task_id)
+      raise A2A::TaskNotFoundError.new(task_id) unless task
 
-    config_data = request.to_h
-    config_data.delete("taskId")
-    config_data.delete("tenant")
+      config_data = request.to_h
+      config_data.delete("taskId")
+      config_data.delete("tenant")
 
-    result = store.create_push_config(task_id, config_data)
-    A2A::Schema["Task Push Notification Config"].new(result)
+      result = sqlite_store.create_push_config(task_id, config_data)
+      A2A::Schema["Task Push Notification Config"].new(result)
+    }
   end
 
-  on "GetTaskPushNotificationConfig" do |request|
-    task_id   = request.task_id
-    config_id = request.id
+  on "GetTaskPushNotificationConfig" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      task_id   = request.task_id
+      config_id = request.id
 
-    task = store.get(task_id)
-    raise A2A::TaskNotFoundError.new(task_id) unless task
+      task = sqlite_store.get(task_id)
+      raise A2A::TaskNotFoundError.new(task_id) unless task
 
-    config = store.get_push_config(task_id, config_id)
-    raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
+      config = sqlite_store.get_push_config(task_id, config_id)
+      raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
-    A2A::Schema["Task Push Notification Config"].new(config)
+      A2A::Schema["Task Push Notification Config"].new(config)
+    }
   end
 
-  on "ListTaskPushNotificationConfigs" do |request|
-    task_id = request.task_id
-    task = store.get(task_id)
-    raise A2A::TaskNotFoundError.new(task_id) unless task
+  on "ListTaskPushNotificationConfigs" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      task_id = request.task_id
+      task = sqlite_store.get(task_id)
+      raise A2A::TaskNotFoundError.new(task_id) unless task
 
-    configs = store.list_push_configs(task_id)
-    A2A::Schema["List Task Push Notification Configs Response"].new(
-      configs:         configs,
-      next_page_token: "",
-    )
+      configs = sqlite_store.list_push_configs(task_id)
+      A2A::Schema["List Task Push Notification Configs Response"].new(
+        configs:         configs,
+        next_page_token: "",
+      )
+    }
   end
 
-  on "DeleteTaskPushNotificationConfig" do |request|
-    task_id   = request.task_id
-    config_id = request.id
+  on "DeleteTaskPushNotificationConfig" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      task_id   = request.task_id
+      config_id = request.id
 
-    task = store.get(task_id)
-    raise A2A::TaskNotFoundError.new(task_id) unless task
+      task = sqlite_store.get(task_id)
+      raise A2A::TaskNotFoundError.new(task_id) unless task
 
-    store.delete_push_config(task_id, config_id)
-    nil
+      sqlite_store.delete_push_config(task_id, config_id)
+      nil
+    }
   end
 end
 
 # ─── Boot ──────────────────────────────────────────────────────────────
 
-app = A2A::Server.new(agent_card: agent_card, store: sqlite_store)
+app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)
 
 Console.info(self) { "Webhook Worker starting..." }

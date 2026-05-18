@@ -24,8 +24,10 @@ module A2A
   # Usage:
   #
   #   agent = A2A::Agent.new do
-  #     on "SendMessage" do |request|
-  #       respond A2A::Schema["Send Message Response"].new({})
+  #     on "SendMessage" do
+  #       respond_with -> (env) {
+  #         A2A::Schema["Send Message Response"].new({})
+  #       }
   #     end
   #   end
   #

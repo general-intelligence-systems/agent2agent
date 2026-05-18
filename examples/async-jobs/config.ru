@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
-require "scampi"
 require "a2a"
 require "a2a/sse"
 require "a2a/store"
@@ -17,8 +16,8 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
-  parts = message["parts"] || []
-  parts.filter_map { |p| p["text"] }.join("\n")
+  parts = message.parts || []
+  parts.filter_map { |p| p.text }.join("\n")
 }
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
@@ -48,82 +47,85 @@ agent = A2A::Agent.new do
   #   - Blocking (default): waits for job to complete, returns final result
   #   - Non-blocking (returnImmediately: true): returns SUBMITTED, processes in background
   #
-  on "SendMessage" do |request|
-    msg = request.message
-    text = extract_text.(msg)
+  on "SendMessage" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      msg = request.message
+      text = extract_text.(msg)
 
-    context_id = msg["contextId"]
-    context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
-    task_id    = SecureRandom.uuid
+      context_id = msg.context_id
+      context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
+      task_id    = SecureRandom.uuid
 
-    store.create(task_id, context_id)
-    store.add_message(task_id, {
-      "messageId" => msg["messageId"] || SecureRandom.uuid,
-      "role"      => "ROLE_USER",
-      "parts"     => [{ "text" => text }],
-    })
+      sqlite_store.create(task_id, context_id)
+      sqlite_store.add_message(task_id, {
+        "messageId" => msg.message_id || SecureRandom.uuid,
+        "role"      => "ROLE_USER",
+        "parts"     => [{ "text" => text }],
+      })
 
-    # Check for returnImmediately configuration
-    return_immediately = false
-    if request.configuration
-      cfg = request.configuration
-      return_immediately = !!(cfg["returnImmediately"])
-    end
-
-    # The actual work — runs either inline or in background
-    do_work = proc do
-      store.update_state(task_id, "TASK_STATE_WORKING")
-
-      WORK_STEPS.each do |step|
-        sleep step[:delay]
-        store.update_state(task_id, "TASK_STATE_WORKING", message: {
-          "messageId" => SecureRandom.uuid,
-          "role"      => "ROLE_AGENT",
-          "parts"     => [{ "text" => step[:message] }],
-        })
+      # Check for returnImmediately configuration
+      return_immediately = false
+      if request.configuration
+        cfg = request.configuration
+        return_immediately = !!(cfg.return_immediately)
       end
 
-      artifact = {
-        "artifactId" => SecureRandom.uuid,
-        "name"       => "analysis-report",
-        "parts"      => [{ "text" => "Analysis Report for: #{text}\n\nFindings:\n- Data processed: 1,247 records\n- Anomalies detected: 3\n- Confidence: 94.7%\n- Recommendation: Proceed with caution\n\n[Simulated analysis result]" }],
-      }
-      store.add_artifact(task_id, artifact)
-      store.add_message(task_id, {
-        "messageId" => SecureRandom.uuid,
-        "role"      => "ROLE_AGENT",
-        "parts"     => [{ "text" => "Analysis complete. See the attached report." }],
-      })
-      store.complete(task_id, nil)
-    end
+      # The actual work — runs either inline or in background
+      do_work = proc do
+        sqlite_store.update_state(task_id, "TASK_STATE_WORKING")
 
-    if return_immediately
-      # ── Non-blocking: return SUBMITTED, process in background fiber ──
-      processor.call(&do_work)
+        WORK_STEPS.each do |step|
+          sleep step[:delay]
+          sqlite_store.update_state(task_id, "TASK_STATE_WORKING", message: {
+            "messageId" => SecureRandom.uuid,
+            "role"      => "ROLE_AGENT",
+            "parts"     => [{ "text" => step[:message] }],
+          })
+        end
 
-      task = store.get(task_id)
-      A2A::Schema["Send Message Response"].new(
-        task: {
-          "id"        => task[:id],
-          "contextId" => task[:context_id],
-          "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+        artifact = {
+          "artifactId" => SecureRandom.uuid,
+          "name"       => "analysis-report",
+          "parts"      => [{ "text" => "Analysis Report for: #{text}\n\nFindings:\n- Data processed: 1,247 records\n- Anomalies detected: 3\n- Confidence: 94.7%\n- Recommendation: Proceed with caution\n\n[Simulated analysis result]" }],
         }
-      )
-    else
-      # ── Blocking: do the work inline, return final result ──
-      do_work.call
+        sqlite_store.add_artifact(task_id, artifact)
+        sqlite_store.add_message(task_id, {
+          "messageId" => SecureRandom.uuid,
+          "role"      => "ROLE_AGENT",
+          "parts"     => [{ "text" => "Analysis complete. See the attached report." }],
+        })
+        sqlite_store.complete(task_id, nil)
+      end
 
-      task = store.get(task_id)
-      A2A::Schema["Send Message Response"].new(
-        task: {
-          "id"        => task[:id],
-          "contextId" => task[:context_id],
-          "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-          "artifacts" => task[:artifacts],
-          "history"   => task[:history],
-        }
-      )
-    end
+      if return_immediately
+        # ── Non-blocking: return SUBMITTED, process in background fiber ──
+        processor.call(&do_work)
+
+        task = sqlite_store.get(task_id)
+        A2A::Schema["Send Message Response"].new(
+          task: {
+            "id"        => task[:id],
+            "contextId" => task[:context_id],
+            "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+          }
+        )
+      else
+        # ── Blocking: do the work inline, return final result ──
+        do_work.call
+
+        task = sqlite_store.get(task_id)
+        A2A::Schema["Send Message Response"].new(
+          task: {
+            "id"        => task[:id],
+            "contextId" => task[:context_id],
+            "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+            "artifacts" => task[:artifacts],
+            "history"   => task[:history],
+          }
+        )
+      end
+    }
   end
 
   # ── SubscribeToTask ─────────────────────────────────────────────────
@@ -132,96 +134,110 @@ agent = A2A::Agent.new do
   # First event is the current task snapshot, then live updates
   # until terminal state.
   #
-  on "SubscribeToTask" do |request|
-    id = request.id
-    task = store.get(id)
-    raise A2A::TaskNotFoundError.new(id) unless task
-    raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
+  on "SubscribeToTask" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      id = request.id
+      task = sqlite_store.get(id)
+      raise A2A::TaskNotFoundError.new(id) unless task
+      raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
 
-    sub_queue = store.subscribe(id)
-    raise A2A::TaskNotFoundError.new(id) unless sub_queue
+      sub_queue = sqlite_store.subscribe(id)
+      raise A2A::TaskNotFoundError.new(id) unless sub_queue
 
-    s = stream
-
-    Async do
-      # First event: current snapshot
-      s.event({
-        "task" => {
-          "id"        => task[:id],
-          "contextId" => task[:context_id],
-          "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-          "artifacts" => task[:artifacts],
-        },
-      })
-
-      # Relay live events from PubSub
-      while (event = sub_queue.dequeue)
-        case event[:type]
-        when :status
-          s.event({ "statusUpdate" => event[:data] })
-        when :artifact
-          s.event({ "artifactUpdate" => event[:data] })
-        end
-
-        if event[:type] == :status
-          state = event[:data].dig("status", "state")
-          break if terminal_states.include?(state)
-        end
+      s = if env["a2a.json_rpc_id"]
+        A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
+      else
+        A2A::SSE::RestStream.new
       end
+      env["a2a.stream"] = s
 
-      s.finish
-      store.unsubscribe(id, sub_queue)
-    rescue => e
-      Console.error("SubscribeToTask") { e.full_message }
-      s.finish
-    end
+      Async do
+        # First event: current snapshot
+        s.event({
+          "task" => {
+            "id"        => task[:id],
+            "contextId" => task[:context_id],
+            "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+            "artifacts" => task[:artifacts],
+          },
+        })
+
+        # Relay live events from PubSub
+        while (event = sub_queue.dequeue)
+          case event[:type]
+          when :status
+            s.event({ "statusUpdate" => event[:data] })
+          when :artifact
+            s.event({ "artifactUpdate" => event[:data] })
+          end
+
+          if event[:type] == :status
+            state = event[:data].dig("status", "state")
+            break if terminal_states.include?(state)
+          end
+        end
+
+        s.finish
+        sqlite_store.unsubscribe(id, sub_queue)
+      rescue => e
+        Console.error("SubscribeToTask") { e.full_message }
+        s.finish
+      end
+    }
   end
 
   # ── GetTask ──────────────────────────────────────────────────────────
-  on "GetTask" do |request|
-    id = request.id
-    task = store.get(id)
-    raise A2A::TaskNotFoundError.new(id) unless task
+  on "GetTask" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      id = request.id
+      task = sqlite_store.get(id)
+      raise A2A::TaskNotFoundError.new(id) unless task
 
-    history = task[:history]
-    if request.history_length
-      hl = request.history_length.to_i
-      history = hl == 0 ? nil : history.last(hl)
-    end
+      history = task[:history]
+      if request.history_length
+        hl = request.history_length.to_i
+        history = hl == 0 ? nil : history.last(hl)
+      end
 
-    result = {
-      "id"        => task[:id],
-      "contextId" => task[:context_id],
-      "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-      "artifacts" => task[:artifacts],
+      result = {
+        "id"        => task[:id],
+        "contextId" => task[:context_id],
+        "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+        "artifacts" => task[:artifacts],
+      }
+      result["history"] = history if history
+
+      A2A::Schema["Task"].new(result)
     }
-    result["history"] = history if history
-
-    A2A::Schema["Task"].new(result)
   end
 
   # ── CancelTask ──────────────────────────────────────────────────────
-  on "CancelTask" do |request|
-    id = request.id
-    task = store.get(id)
-    raise A2A::TaskNotFoundError.new(id) unless task
-    raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if terminal_states.include?(task[:state])
+  on "CancelTask" do
+    respond_with -> (env) {
+      request = env["a2a.request"]
+      id = request.id
+      task = sqlite_store.get(id)
+      raise A2A::TaskNotFoundError.new(id) unless task
+      raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if terminal_states.include?(task[:state])
 
-    store.cancel(id)
-    task = store.get(id)
+      sqlite_store.cancel(id)
+      task = sqlite_store.get(id)
 
-    A2A::Schema["Task"].new(
-      id:         task[:id],
-      context_id: task[:context_id],
-      status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
-      artifacts:  task[:artifacts],
-    )
+      A2A::Schema["Task"].new(
+        id:         task[:id],
+        context_id: task[:context_id],
+        status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
+        artifacts:  task[:artifacts],
+      )
+    }
   end
 end
 
 # ─── Boot ──────────────────────────────────────────────────────────────
 
-app = A2A::Server.new(agent_card: agent_card, store: sqlite_store)
+app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)
 
 Console.info(self) { "Slow Worker starting..." }
