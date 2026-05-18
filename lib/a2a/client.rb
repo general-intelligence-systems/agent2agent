@@ -203,9 +203,11 @@ test do
     end
 
     result = client.send_message(
-      message_id: "msg-1",
-      role: "ROLE_USER",
-      parts: [{ text: "Hello" }]
+      message: {
+        message_id: "msg-1",
+        role: "ROLE_USER",
+        parts: [{ text: "Hello" }]
+      }
     )
     result.should.be.kind_of(A2A::Schema::Definition)
   end
@@ -232,7 +234,7 @@ test do
       end
     end
 
-    result = client.get_task("task-123")
+    result = client.get_task(id: "task-123")
     result.should.be.kind_of(A2A::Schema::Definition)
     result.id.should == "task-123"
     result.context_id.should == "ctx-456"
@@ -254,7 +256,7 @@ test do
       end
     end
 
-    lambda { client.get_task("task-123") }.should.raise(RuntimeError)
+    lambda { client.get_task(id: "task-123") }.should.raise(RuntimeError)
   end
 
   it "json_rpc: raises ValidationError on invalid params" do
@@ -264,7 +266,7 @@ test do
       end
     end
 
-    lambda { client.send_message("not_a_hash") }.should.raise(A2A::Schema::ValidationError)
+    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Schema::ValidationError)
   end
 
   it "json_rpc: send_streaming_message sends correct method and Accept header" do
@@ -279,9 +281,11 @@ test do
     end
 
     client.send_streaming_message(
-      message_id: "msg-1",
-      role: "ROLE_USER",
-      parts: [{ text: "Hello" }]
+      message: {
+        message_id: "msg-1",
+        role: "ROLE_USER",
+        parts: [{ text: "Hello" }]
+      }
     ) do |chunk, env|
     end
 
@@ -312,9 +316,11 @@ test do
     end
 
     result = client.send_message(
-      message_id: "msg-1",
-      role: "ROLE_USER",
-      parts: [{ text: "Hello" }]
+      message: {
+        message_id: "msg-1",
+        role: "ROLE_USER",
+        parts: [{ text: "Hello" }]
+      }
     )
     result.should.be.kind_of(A2A::Schema::Definition)
     captured_env.request_headers["content-type"].should == "application/a2a+json"
@@ -369,7 +375,7 @@ test do
       end
     end
 
-    result = client.cancel_task("task-123")
+    result = client.cancel_task(id: "task-123")
     result.should.be.kind_of(A2A::Schema::Definition)
     result.id.should == "task-123"
   end
@@ -468,7 +474,7 @@ test do
       end
     end
 
-    client.subscribe_to_task("task-1") do |chunk, env|
+    client.subscribe_to_task(id: "task-1") do |chunk, env|
     end
 
     captured_env.request_headers["Accept"].should == "text/event-stream"
@@ -496,6 +502,6 @@ test do
       end
     end
 
-    lambda { client.send_message("not_a_hash") }.should.raise(A2A::Schema::ValidationError)
+    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Schema::ValidationError)
   end
 end

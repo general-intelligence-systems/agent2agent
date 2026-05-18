@@ -7,9 +7,11 @@ require "a2a"
 client = A2A::Client.new("http://localhost:9292")
 
 result = client.send_message(
-  message_id: "msg-1",
-  role: "ROLE_USER",
-  parts: [{ text: "Hello" }]
+  message: {
+    message_id: "msg-1",
+    role: "ROLE_USER",
+    parts: [{ text: "Hello" }]
+  }
 )
 
 pp result.to_h
