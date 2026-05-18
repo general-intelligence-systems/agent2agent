@@ -23,14 +23,6 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
-make_stream = ->(env) {
-  if env["a2a.json_rpc_id"]
-    A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
-  else
-    A2A::SSE::RestStream.new
-  end
-}
-
 # ─── Agent ────────────────────────────────────────────────────────────
 
 agent = A2A::Agent.new do
@@ -74,6 +66,7 @@ agent = A2A::Agent.new do
 
   # ── SendStreamingMessage ───────────────────────────────────────────
   on "SendStreamingMessage" do
+    use A2A::Middleware::SSEStream
     use A2A::Middleware::ExtractMessage
     respond_with ->(env) {
       request = env["a2a.request"]
@@ -95,62 +88,37 @@ agent = A2A::Agent.new do
       }
       TASKS[task_id] = task
 
-      stream = make_stream.(env)
-      env["a2a.stream"] = stream
-
-      Async do
+      env["a2a.stream"].open(task_id: task_id, context_id: context_id) do |stream|
         sleep 0.05
 
         # Event 1: task snapshot
-        stream.event({
-          "task" => {
-            "id"        => task_id,
-            "contextId" => context_id,
-            "status"    => { "state" => "TASK_STATE_WORKING", "timestamp" => now_ts.() },
-          },
-        })
+        stream.task(status: { state: "TASK_STATE_WORKING", timestamp: now_ts.() })
 
         sleep 0.05
 
         # Event 2: artifact
+        artifact_id = SecureRandom.uuid
         artifact = {
-          "artifactId" => SecureRandom.uuid,
+          "artifactId" => artifact_id,
           "name"       => "echo-response",
           "parts"      => [{ "text" => "Echo: #{text}" }],
         }
         task["artifacts"] << artifact
         task["history"] << { "messageId" => SecureRandom.uuid, "role" => "ROLE_AGENT", "parts" => [{ "text" => "Echo: #{text}" }] }
 
-        stream.event({
-          "artifactUpdate" => {
-            "taskId"    => task_id,
-            "contextId" => context_id,
-            "artifact"  => artifact,
-            "append"    => false,
-            "lastChunk" => true,
-          },
-        })
+        stream.artifact_update(
+          artifact: { artifact_id: artifact_id, name: "echo-response", parts: [{ text: "Echo: #{text}" }] },
+          append: false,
+          last_chunk: true,
+        )
 
         sleep 0.05
 
         # Event 3: completed
         task["status"] = { "state" => "TASK_STATE_COMPLETED", "timestamp" => now_ts.() }
 
-        stream.event({
-          "statusUpdate" => {
-            "taskId"    => task_id,
-            "contextId" => context_id,
-            "status"    => task["status"],
-          },
-        })
-
-        stream.finish
-      rescue => e
-        Console.error("SendStreamingMessage") { e.full_message }
-        stream.finish
+        stream.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: now_ts.() })
       end
-
-      nil
     }
   end
 
@@ -199,35 +167,22 @@ agent = A2A::Agent.new do
 
   # ── SubscribeToTask ────────────────────────────────────────────────
   on "SubscribeToTask" do
+    use A2A::Middleware::SSEStream
     respond_with ->(env) {
       request = env["a2a.request"]
       id = request.id
       task = TASKS[id]
       raise A2A::TaskNotFoundError.new(id) unless task
 
-      stream = make_stream.(env)
-      env["a2a.stream"] = stream
+      env["a2a.stream"].open(task_id: id, context_id: task["contextId"]) do |stream|
+        stream.task(
+          status:    task["status"],
+          artifacts: task["artifacts"],
+          history:   task["history"],
+        )
 
-      Async do
-        stream.event({
-          "task" => task,
-        })
-
-        stream.event({
-          "statusUpdate" => {
-            "taskId"    => id,
-            "contextId" => task["contextId"],
-            "status"    => task["status"],
-          },
-        })
-
-        stream.finish
-      rescue => e
-        Console.error("SubscribeToTask") { e.full_message }
-        stream.finish
+        stream.status_update(status: task["status"])
       end
-
-      nil
     }
   end
 

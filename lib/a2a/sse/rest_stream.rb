@@ -15,10 +15,10 @@ module A2A
     #
     # Usage:
     #
-    #   stream = A2A::SSE::RestStream.new
+    #   stream = A2A::SSE::RestStream.new(task_id: "t1", context_id: "c1")
     #
     #   Async do
-    #     stream.event({ "task" => { ... } })
+    #     stream.task(status: { state: "TASK_STATE_WORKING", timestamp: "..." })
     #     stream.finish
     #   end
     #
@@ -32,9 +32,9 @@ end
 test do
   describe "A2A::SSE::RestStream" do
     it "emits bare JSON events (no envelope)" do
-      stream = A2A::SSE::RestStream.new
+      stream = A2A::SSE::RestStream.new(task_id: "t1", context_id: "c1")
 
-      stream.event({ "statusUpdate" => { "taskId" => "t1" } })
+      stream.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: "2025-01-01T00:00:00Z" })
       stream.finish
 
       chunk = stream.read
@@ -43,8 +43,20 @@ test do
     end
 
     it "is a subclass of SSE::Stream" do
-      stream = A2A::SSE::RestStream.new
+      stream = A2A::SSE::RestStream.new(task_id: "t1", context_id: "c1")
       stream.is_a?(A2A::SSE::Stream).should == true
+    end
+
+    it "injects task_id and context_id into typed events" do
+      stream = A2A::SSE::RestStream.new(task_id: "t1", context_id: "c1")
+
+      stream.task(status: { state: "TASK_STATE_WORKING" })
+      stream.finish
+
+      chunk = stream.read
+      parsed = JSON.parse(chunk.sub(/\Adata: /, "").strip)
+      parsed["task"]["id"].should == "t1"
+      parsed["task"]["contextId"].should == "c1"
     end
   end
 end

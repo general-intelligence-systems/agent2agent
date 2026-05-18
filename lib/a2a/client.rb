@@ -111,14 +111,16 @@ module A2A
         request = operation.request_schema.new(params)
         request.valid!
 
+        parser = A2A::SSE::EventParser.new(binding: @binding)
+
         @conn.post("/") do |req|
           req.options.context = { a2a_operation: operation }
           req.body = request
           req.headers["Accept"] = "text/event-stream"
 
           if block
-            req.options.on_data = proc do |chunk, _size, env|
-              block.call(chunk, env)
+            req.options.on_data = proc do |chunk, _size, _env|
+              parser.feed(chunk) { |event| block.call(event) }
             end
           end
         end
@@ -286,7 +288,7 @@ test do
         role: "ROLE_USER",
         parts: [{ text: "Hello" }]
       }
-    ) do |chunk, env|
+    ) do |event|
     end
 
     parsed = JSON.parse(captured_env.request_body)
@@ -474,7 +476,7 @@ test do
       end
     end
 
-    client.subscribe_to_task(id: "task-1") do |chunk, env|
+    client.subscribe_to_task(id: "task-1") do |event|
     end
 
     captured_env.request_headers["Accept"].should == "text/event-stream"

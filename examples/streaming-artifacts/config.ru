@@ -45,6 +45,7 @@ agent = A2A::Agent.new do
   #   artifactUpdate { append: true,  lastChunk: true  }  — final chunk
   #
   on "SendStreamingMessage" do
+    use A2A::Middleware::SSEStream
     use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
@@ -63,24 +64,11 @@ agent = A2A::Agent.new do
       })
       sqlite_store.update_state(task_id, "TASK_STATE_WORKING")
 
-      s = if env["a2a.json_rpc_id"]
-        A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
-      else
-        A2A::SSE::RestStream.new
-      end
-      env["a2a.stream"] = s
-
-      Async do
+      env["a2a.stream"].open(task_id: task_id, context_id: context_id) do |s|
         sleep 0.05
 
         # Event 1: initial task snapshot
-        s.event({
-          "task" => {
-            "id"        => task_id,
-            "contextId" => context_id,
-            "status"    => { "state" => "TASK_STATE_WORKING", "timestamp" => now_ts.() },
-          },
-        })
+        s.task(status: { state: "TASK_STATE_WORKING", timestamp: now_ts.() })
 
         # Stream each file as a separate artifact with multiple chunks
         CODE_FILES.each_with_index do |(filename, chunks), file_idx|
@@ -92,39 +80,31 @@ agent = A2A::Agent.new do
 
             sleep 0.05  # simulate progressive generation
 
-            s.event({
-              "artifactUpdate" => {
-                "taskId"    => task_id,
-                "contextId" => context_id,
-                "artifact"  => {
-                  "artifactId"  => artifact_id,
-                  "name"        => filename,
-                  "description" => "Generated file: #{filename}",
-                  "parts"       => [{ "text" => chunk_text }],
-                },
-                "append"    => !is_first,
-                "lastChunk" => is_last,
+            s.artifact_update(
+              artifact: {
+                artifact_id: artifact_id,
+                name:        filename,
+                description: "Generated file: #{filename}",
+                parts:       [{ text: chunk_text }],
               },
-            })
+              append:     !is_first,
+              last_chunk: is_last,
+            )
           end
 
           # Status update between files
           if file_idx < CODE_FILES.size - 1
-            s.event({
-              "statusUpdate" => {
-                "taskId"    => task_id,
-                "contextId" => context_id,
-                "status"    => {
-                  "state"     => "TASK_STATE_WORKING",
-                  "timestamp" => now_ts.(),
-                  "message"   => {
-                    "messageId" => SecureRandom.uuid,
-                    "role"      => "ROLE_AGENT",
-                    "parts"     => [{ "text" => "Generated #{filename}, working on next file..." }],
-                  },
+            s.status_update(
+              status: {
+                state:     "TASK_STATE_WORKING",
+                timestamp: now_ts.(),
+                message:   {
+                  message_id: SecureRandom.uuid,
+                  role:       "ROLE_AGENT",
+                  parts:      [{ text: "Generated #{filename}, working on next file..." }],
                 },
               },
-            })
+            )
           end
         end
 
@@ -145,18 +125,7 @@ agent = A2A::Agent.new do
 
         # Final status: completed
         sqlite_store.update_state(task_id, "TASK_STATE_COMPLETED")
-        s.event({
-          "statusUpdate" => {
-            "taskId"    => task_id,
-            "contextId" => context_id,
-            "status"    => { "state" => "TASK_STATE_COMPLETED", "timestamp" => now_ts.() },
-          },
-        })
-
-        s.finish
-      rescue => e
-        Console.error("SendStreamingMessage") { e.full_message }
-        s.finish
+        s.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: now_ts.() })
       end
     }
   end

@@ -12,6 +12,6 @@ client.send_streaming_message(
     role: "ROLE_USER",
     parts: [{ text: "Stream me" }]
   }
-) do |chunk, env|
-  puts chunk
+) do |event|
+  puts event.inspect
 end

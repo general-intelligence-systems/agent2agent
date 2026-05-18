@@ -92,6 +92,7 @@ agent = A2A::Agent.new do
   # Uses A2A::SSE::Stream (Protocol::HTTP::Body::Writable) — no threads.
   #
   on "SendStreamingMessage" do
+    use A2A::Middleware::SSEStream
     use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
@@ -111,68 +112,39 @@ agent = A2A::Agent.new do
       })
       sqlite_store.update_state(task_id, "TASK_STATE_WORKING")
 
-      if env["a2a.json_rpc_id"]
-        s = env["a2a.stream"] = A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
-      else
-        s = env["a2a.stream"] = A2A::SSE::RestStream.new
-      end
-
-      # Emit events in a background fiber — no threads, pure async
-      Async do
+      env["a2a.stream"].open(task_id: task_id, context_id: context_id) do |s|
         sleep 0.05
 
         # Event 1: initial Task snapshot
-        task = sqlite_store.get(task_id)
-        s.event({
-          "task" => {
-            "id"        => task[:id],
-            "contextId" => task[:context_id],
-            "status"    => { "state" => "TASK_STATE_WORKING", "timestamp" => now_ts.() },
-          },
-        })
+        s.task(status: { state: "TASK_STATE_WORKING", timestamp: now_ts.() })
 
         sleep 0.05
 
         # Event 2: artifact update
-        artifact = {
-          "artifactId" => SecureRandom.uuid,
+        artifact_id = SecureRandom.uuid
+        sqlite_store.add_artifact(task_id, {
+          "artifactId" => artifact_id,
           "name"       => "echo-response",
           "parts"      => [{ "text" => "Echo: #{text}" }],
-        }
-        sqlite_store.add_artifact(task_id, artifact)
+        })
         sqlite_store.add_message(task_id, {
           "messageId" => SecureRandom.uuid,
           "role"      => "ROLE_AGENT",
           "parts"     => [{ "text" => "Echo: #{text}" }],
         })
 
-        s.event({
-          "artifactUpdate" => {
-            "taskId"    => task_id,
-            "contextId" => context_id,
-            "artifact"  => artifact,
-            "append"    => false,
-            "lastChunk" => true,
-          },
-        })
+        s.artifact_update(
+          artifact: { artifact_id: artifact_id, name: "echo-response", parts: [{ text: "Echo: #{text}" }] },
+          append: false,
+          last_chunk: true,
+        )
 
         sleep 0.05
 
         # Event 3: completed
         sqlite_store.update_state(task_id, "TASK_STATE_COMPLETED")
 
-        s.event({
-          "statusUpdate" => {
-            "taskId"    => task_id,
-            "contextId" => context_id,
-            "status"    => { "state" => "TASK_STATE_COMPLETED", "timestamp" => now_ts.() },
-          },
-        })
-
-        s.finish
-      rescue => e
-        Console.error("SendStreamingMessage") { e.full_message }
-        s.finish
+        s.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: now_ts.() })
       end
     }
   end
@@ -267,129 +239,111 @@ agent = A2A::Agent.new do
     }
   end
 
-  # SSE stream via Falcon-native async streaming + Async::Queue pub/sub.
-  # No threads — pure fiber-based cooperative concurrency.
-  #
-  on "SubscribeToTask" do
-    use A2A::Middleware::FetchTask, store: sqlite_store
-    respond_with -> (env) {
-      task = env["a2a.task"]
-      id   = task[:id]
-      raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
+  ## SSE stream via Falcon-native async streaming + Async::Queue pub/sub.
+  ## No threads — pure fiber-based cooperative concurrency.
+  ##
+  #on "SubscribeToTask" do
+  #  use A2A::Middleware::SSEStream
+  #  use A2A::Middleware::FetchTask, store: sqlite_store
+  #  respond_with -> (env) {
+  #    task = env["a2a.task"]
+  #    id   = task[:id]
+  #    raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
 
-      sub_queue = sqlite_store.subscribe(id)
-      raise A2A::TaskNotFoundError.new(id) unless sub_queue
+  #    sub_queue = sqlite_store.subscribe(id)
+  #    raise A2A::TaskNotFoundError.new(id) unless sub_queue
 
-      # Create the SSE stream — binding-aware
-      s = if env["a2a.json_rpc_id"]
-        A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
-      else
-        A2A::SSE::RestStream.new
-      end
-      env["a2a.stream"] = s
+  #    env["a2a.stream"].open(task_id: id, context_id: task[:context_id]) do |s|
+  #      # First event: current task snapshot (per A2A spec)
+  #      s.task(
+  #        status:    { state: task[:state], timestamp: task[:updated_at] },
+  #        artifacts: task[:artifacts],
+  #      )
 
-      # Relay store pub/sub events to SSE in a background fiber
-      Async do
-        # First event: current task snapshot (per A2A spec)
-        s.event({
-          "task" => {
-            "id"        => task[:id],
-            "contextId" => task[:context_id],
-            "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-            "artifacts" => task[:artifacts],
-          },
-        })
+  #      # Relay events from Async::Queue (fiber-safe dequeue)
+  #      while (event = sub_queue.dequeue)
+  #        case event[:type]
+  #        when :status
+  #          s.status_update(status: event[:data])
+  #        when :artifact
+  #          s.artifact_update(artifact: event[:data])
+  #        end
 
-        # Relay events from Async::Queue (fiber-safe dequeue)
-        while (event = sub_queue.dequeue)
-          case event[:type]
-          when :status
-            s.event({ "statusUpdate" => event[:data] })
-          when :artifact
-            s.event({ "artifactUpdate" => event[:data] })
-          end
+  #        # Close on terminal state
+  #        if event[:type] == :status
+  #          state = event[:data].dig("status", "state") || event[:data].dig(:status, :state)
+  #          break if terminal_states.include?(state)
+  #        end
+  #      end
 
-          # Close on terminal state
-          if event[:type] == :status
-            state = event[:data].dig("status", "state")
-            break if terminal_states.include?(state)
-          end
-        end
+  #      sqlite_store.unsubscribe(id, sub_queue)
+  #    end
+  #  }
+  #end
 
-        s.finish
-        sqlite_store.unsubscribe(id, sub_queue)
-      rescue => e
-        Console.error("SubscribeToTask") { e.full_message }
-        s.finish
-      end
-    }
-  end
+  #on "CreateTaskPushNotificationConfig" do
+  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  respond_with -> (env) {
+  #    request = env["a2a.request"]
+  #    task_id = env["a2a.task"][:id]
 
-  on "CreateTaskPushNotificationConfig" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
-    respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id = env["a2a.task"][:id]
+  #    request.to_h.then do |config_data|
+  #      config_data.delete("taskId")
+  #      config_data.delete("tenant")
 
-      request.to_h.then do |config_data|
-        config_data.delete("taskId")
-        config_data.delete("tenant")
+  #      sqlite_store.create_push_config(task_id, config_data).then do |result|
+  #        A2A::Schema["Task Push Notification Config"].new(result)
+  #      end
+  #    end
+  #  }
+  #end
 
-        sqlite_store.create_push_config(task_id, config_data).then do |result|
-          A2A::Schema["Task Push Notification Config"].new(result)
-        end
-      end
-    }
-  end
+  #on "GetTaskPushNotificationConfig" do
+  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  respond_with -> (env) {
+  #    request   = env["a2a.request"]
+  #    task_id   = env["a2a.task"][:id]
+  #    config_id = request.id
 
-  on "GetTaskPushNotificationConfig" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
-    respond_with -> (env) {
-      request   = env["a2a.request"]
-      task_id   = env["a2a.task"][:id]
-      config_id = request.id
+  #    config = sqlite_store.get_push_config(task_id, config_id)
+  #    raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
-      config = sqlite_store.get_push_config(task_id, config_id)
-      raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
+  #    A2A::Schema["Task Push Notification Config"].new(config)
+  #  }
+  #end
 
-      A2A::Schema["Task Push Notification Config"].new(config)
-    }
-  end
+  #on "ListTaskPushNotificationConfigs" do
+  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  respond_with -> (env) {
+  #    task_id = env["a2a.task"][:id]
 
-  on "ListTaskPushNotificationConfigs" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
-    respond_with -> (env) {
-      task_id = env["a2a.task"][:id]
+  #    sqlite_store.list_push_configs(task_id).then do |configs|
+  #      A2A::Schema["List Task Push Notification Configs Response"].new(
+  #        configs:         configs,
+  #        next_page_token: "",
+  #      )
+  #    end
+  #  }
+  #end
 
-      sqlite_store.list_push_configs(task_id).then do |configs|
-        A2A::Schema["List Task Push Notification Configs Response"].new(
-          configs:         configs,
-          next_page_token: "",
-        )
-      end
-    }
-  end
+  #on "DeleteTaskPushNotificationConfig" do
+  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  respond_with -> (env) {
+  #    request   = env["a2a.request"]
+  #    task_id   = env["a2a.task"][:id]
+  #    config_id = request.id
 
-  on "DeleteTaskPushNotificationConfig" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
-    respond_with -> (env) {
-      request   = env["a2a.request"]
-      task_id   = env["a2a.task"][:id]
-      config_id = request.id
+  #    sqlite_store.delete_push_config(task_id, config_id)
+  #    nil
+  #  }
+  #end
 
-      sqlite_store.delete_push_config(task_id, config_id)
-      nil
-    }
-  end
-
-  on "GetExtendedAgentCard" do
-    respond_with -> (env) {
-      raise A2A::UnsupportedOperationError.new(message: "Extended agent card is not supported")
-    }
-  end
+  #on "GetExtendedAgentCard" do
+  #  respond_with -> (env) {
+  #    raise A2A::UnsupportedOperationError.new(message: "Extended agent card is not supported")
+  #  }
+  #end
 end
-
-# ─── Boot ─────────────────────────────────────────────────────────────
 
 app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)

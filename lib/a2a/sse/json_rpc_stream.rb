@@ -11,10 +11,12 @@ module A2A
     #
     # Usage:
     #
-    #   stream = A2A::SSE::JsonRpcStream.new(json_rpc_id: 1)
+    #   stream = A2A::SSE::JsonRpcStream.new(
+    #     task_id: "t1", context_id: "c1", json_rpc_id: 1
+    #   )
     #
     #   Async do
-    #     stream.event({ "task" => { ... } })
+    #     stream.task(status: { state: "TASK_STATE_WORKING", timestamp: "..." })
     #     stream.finish
     #   end
     #
@@ -45,9 +47,11 @@ end
 test do
   describe "A2A::SSE::JsonRpcStream" do
     it "wraps events in JSON-RPC 2.0 envelopes" do
-      stream = A2A::SSE::JsonRpcStream.new(json_rpc_id: 42)
+      stream = A2A::SSE::JsonRpcStream.new(
+        task_id: "t1", context_id: "c1", json_rpc_id: 42
+      )
 
-      stream.event({ "task" => { "id" => "t1" } })
+      stream.task(status: { state: "TASK_STATE_WORKING", timestamp: "2025-01-01T00:00:00Z" })
       stream.finish
 
       chunk = stream.read
@@ -58,9 +62,27 @@ test do
     end
 
     it "is a subclass of SSE::Stream" do
-      stream = A2A::SSE::JsonRpcStream.new(json_rpc_id: 1)
+      stream = A2A::SSE::JsonRpcStream.new(
+        task_id: "t1", context_id: "c1", json_rpc_id: 1
+      )
       stream.is_a?(A2A::SSE::Stream).should == true
       stream.is_a?(Protocol::HTTP::Body::Readable).should == true
+    end
+
+    it "typed methods chain through JSON-RPC envelope" do
+      stream = A2A::SSE::JsonRpcStream.new(
+        task_id: "t1", context_id: "c1", json_rpc_id: 7
+      )
+
+      stream.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: "2025-01-01T00:00:00Z" })
+      stream.finish
+
+      chunk = stream.read
+      parsed = JSON.parse(chunk.sub(/\Adata: /, "").strip)
+      parsed["jsonrpc"].should == "2.0"
+      parsed["id"].should == 7
+      parsed["result"]["statusUpdate"]["taskId"].should == "t1"
+      parsed["result"]["statusUpdate"]["contextId"].should == "c1"
     end
   end
 end
