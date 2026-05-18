@@ -205,7 +205,7 @@ test do
     result = client.send_message(
       message_id: "msg-1",
       role: "ROLE_USER",
-      parts: [{ text: "Hello" }] }
+      parts: [{ text: "Hello" }]
     )
     result.should.be.kind_of(A2A::Schema::Definition)
   end
@@ -314,7 +314,7 @@ test do
     result = client.send_message(
       message_id: "msg-1",
       role: "ROLE_USER",
-      parts: [{ text: "Hello" }] }
+      parts: [{ text: "Hello" }]
     )
     result.should.be.kind_of(A2A::Schema::Definition)
     captured_env.request_headers["content-type"].should == "application/a2a+json"
