@@ -2,8 +2,8 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/store"
 require "a2a/middleware"
+require "async/semaphore"
 require "brute"
 require "console"
 require "securerandom"
@@ -21,7 +21,9 @@ llm = Brute::Agent.new(
   run Brute::Middleware::LLMCall.new
 end
 
-sqlite_store = A2A::Store::SQLite.new(path: "greeter.db")
+TASKS = {}
+LOCK  = Async::Semaphore.new(1)
+NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 agent = A2A::Agent.new do
   on "SendMessage" do
@@ -35,7 +37,9 @@ agent = A2A::Agent.new do
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
       task_id    = SecureRandom.uuid
 
-      sqlite_store.create(task_id, context_id)
+      LOCK.acquire do
+        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
+      end
 
       # Call the LLM via Brute
       session = Brute::Session.new
@@ -55,10 +59,14 @@ agent = A2A::Agent.new do
         "name"       => "greeting",
         "parts"      => [{ "text" => response_text }],
       }
-      sqlite_store.add_artifact(task_id, artifact)
-      sqlite_store.complete(task_id, nil)
 
-      task = sqlite_store.get(task_id)
+      task = LOCK.acquire do
+        TASKS[task_id][:artifacts] << artifact
+        TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+        TASKS[task_id][:updated_at] = NOW.()
+        TASKS[task_id]
+      end
+
       A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],

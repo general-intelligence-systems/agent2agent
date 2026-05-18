@@ -2,20 +2,18 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/store"
 require "a2a/middleware"
+require "async/semaphore"
 require "brute"
 require "console"
 require "securerandom"
 require "yaml"
 
-# ─── Agent Card ────────────────────────────────────────────────────────
+# --- Agent Card ----
 
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
-# ─── Helpers ──────────────────────────────────────────────────────────
-
-# ─── Brute Agent (LLM-powered) ───────────────────────────────────────
+# --- Brute Agent (LLM-powered) ---
 
 llm = Brute::Agent.new(
   provider: Brute.provider,
@@ -27,11 +25,13 @@ llm = Brute::Agent.new(
   run Brute::Middleware::LLMCall.new
 end
 
-# ─── Store ────────────────────────────────────────────────────────────
+# --- Store ---
 
-sqlite_store = A2A::Store::SQLite.new(path: "translator.db")
+TASKS = {}
+LOCK  = Async::Semaphore.new(1)
+NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
-# ─── A2A Agent ────────────────────────────────────────────────────────
+# --- A2A Agent ---
 
 agent = A2A::Agent.new do
   on "SendMessage" do
@@ -45,7 +45,9 @@ agent = A2A::Agent.new do
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
       task_id    = SecureRandom.uuid
 
-      sqlite_store.create(task_id, context_id)
+      LOCK.acquire do
+        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
+      end
 
       # Call the LLM via Brute
       session = Brute::Session.new
@@ -65,10 +67,14 @@ agent = A2A::Agent.new do
         "name"       => "translation",
         "parts"      => [{ "text" => response_text }],
       }
-      sqlite_store.add_artifact(task_id, artifact)
-      sqlite_store.complete(task_id, nil)
 
-      task = sqlite_store.get(task_id)
+      task = LOCK.acquire do
+        TASKS[task_id][:artifacts] << artifact
+        TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+        TASKS[task_id][:updated_at] = NOW.()
+        TASKS[task_id]
+      end
+
       A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
@@ -81,7 +87,7 @@ agent = A2A::Agent.new do
   end
 end
 
-# ─── Boot ──────────────────────────────────────────────────────────────
+# --- Boot ---
 
 app = A2A::Server.new(agent_card: agent_card)
 app.register(agent)

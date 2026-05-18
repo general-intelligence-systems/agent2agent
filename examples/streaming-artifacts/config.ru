@@ -3,8 +3,8 @@
 require "bundler/setup"
 require "a2a"
 require "a2a/sse"
-require "a2a/store"
 require "a2a/middleware"
+require "async/semaphore"
 require "console"
 require "securerandom"
 require "async"
@@ -12,9 +12,9 @@ require "yaml"
 
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
-now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
+NOW = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
-# Simulated code files — each split into chunks for streaming
+# Simulated code files -- each split into chunks for streaming
 CODE_FILES = {
   "index.html" => [
     "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n",
@@ -34,15 +34,16 @@ CODE_FILES = {
   ],
 }
 
-sqlite_store = A2A::Store::SQLite.new(path: "codegen.db")
+TASKS = {}
+LOCK  = Async::Semaphore.new(1)
 
 agent = A2A::Agent.new do
 
   # Streams multiple code files as separate artifacts, each in chunks.
   # Event sequence for each file:
-  #   artifactUpdate { append: false, lastChunk: false }  — first chunk
-  #   artifactUpdate { append: true,  lastChunk: false }  — middle chunks
-  #   artifactUpdate { append: true,  lastChunk: true  }  — final chunk
+  #   artifactUpdate { append: false, lastChunk: false }  -- first chunk
+  #   artifactUpdate { append: true,  lastChunk: false }  -- middle chunks
+  #   artifactUpdate { append: true,  lastChunk: true  }  -- final chunk
   #
   on "SendStreamingMessage" do
     use A2A::Middleware::SSEStream
@@ -56,19 +57,22 @@ agent = A2A::Agent.new do
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
       task_id    = SecureRandom.uuid
 
-      sqlite_store.create(task_id, context_id)
-      sqlite_store.add_message(task_id, {
-        "messageId" => msg.message_id || SecureRandom.uuid,
-        "role"      => "ROLE_USER",
-        "parts"     => [{ "text" => text }],
-      })
-      sqlite_store.update_state(task_id, "TASK_STATE_WORKING")
+      LOCK.acquire do
+        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
+        TASKS[task_id][:history] << {
+          "messageId" => msg.message_id || SecureRandom.uuid,
+          "role"      => "ROLE_USER",
+          "parts"     => [{ "text" => text }],
+        }
+        TASKS[task_id][:state] = "TASK_STATE_WORKING"
+        TASKS[task_id][:updated_at] = NOW.()
+      end
 
       env["a2a.stream"].open(task_id: task_id, context_id: context_id) do |s|
         sleep 0.05
 
         # Event 1: initial task snapshot
-        s.task(status: { state: "TASK_STATE_WORKING", timestamp: now_ts.() })
+        s.task(status: { state: "TASK_STATE_WORKING", timestamp: NOW.() })
 
         # Stream each file as a separate artifact with multiple chunks
         CODE_FILES.each_with_index do |(filename, chunks), file_idx|
@@ -97,7 +101,7 @@ agent = A2A::Agent.new do
             s.status_update(
               status: {
                 state:     "TASK_STATE_WORKING",
-                timestamp: now_ts.(),
+                timestamp: NOW.(),
                 message:   {
                   message_id: SecureRandom.uuid,
                   role:       "ROLE_AGENT",
@@ -109,23 +113,27 @@ agent = A2A::Agent.new do
         end
 
         # Persist final artifacts to the store (assembled from chunks)
-        CODE_FILES.each do |filename, chunks|
-          sqlite_store.add_artifact(task_id, {
-            "artifactId" => SecureRandom.uuid,
-            "name"       => filename,
-            "parts"      => [{ "text" => chunks.join }],
-          })
+        LOCK.acquire do
+          CODE_FILES.each do |filename, chunks|
+            TASKS[task_id][:artifacts] << {
+              "artifactId" => SecureRandom.uuid,
+              "name"       => filename,
+              "parts"      => [{ "text" => chunks.join }],
+            }
+          end
+
+          TASKS[task_id][:history] << {
+            "messageId" => SecureRandom.uuid,
+            "role"      => "ROLE_AGENT",
+            "parts"     => [{ "text" => "Generated #{CODE_FILES.size} files: #{CODE_FILES.keys.join(", ")}" }],
+          }
+
+          TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+          TASKS[task_id][:updated_at] = NOW.()
         end
 
-        sqlite_store.add_message(task_id, {
-          "messageId" => SecureRandom.uuid,
-          "role"      => "ROLE_AGENT",
-          "parts"     => [{ "text" => "Generated #{CODE_FILES.size} files: #{CODE_FILES.keys.join(", ")}" }],
-        })
-
         # Final status: completed
-        sqlite_store.update_state(task_id, "TASK_STATE_COMPLETED")
-        s.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: now_ts.() })
+        s.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: NOW.() })
       end
     }
   end
@@ -141,30 +149,37 @@ agent = A2A::Agent.new do
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
       task_id    = SecureRandom.uuid
 
-      sqlite_store.create(task_id, context_id)
-      sqlite_store.add_message(task_id, {
-        "messageId" => msg.message_id || SecureRandom.uuid,
-        "role"      => "ROLE_USER",
-        "parts"     => [{ "text" => text }],
-      })
-
-      # Generate all files synchronously
-      CODE_FILES.each do |filename, chunks|
-        sqlite_store.add_artifact(task_id, {
-          "artifactId" => SecureRandom.uuid,
-          "name"       => filename,
-          "parts"      => [{ "text" => chunks.join }],
-        })
+      LOCK.acquire do
+        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
+        TASKS[task_id][:history] << {
+          "messageId" => msg.message_id || SecureRandom.uuid,
+          "role"      => "ROLE_USER",
+          "parts"     => [{ "text" => text }],
+        }
       end
 
-      sqlite_store.add_message(task_id, {
-        "messageId" => SecureRandom.uuid,
-        "role"      => "ROLE_AGENT",
-        "parts"     => [{ "text" => "Generated #{CODE_FILES.size} files: #{CODE_FILES.keys.join(", ")}" }],
-      })
-      sqlite_store.complete(task_id, nil)
+      # Generate all files synchronously
+      LOCK.acquire do
+        CODE_FILES.each do |filename, chunks|
+          TASKS[task_id][:artifacts] << {
+            "artifactId" => SecureRandom.uuid,
+            "name"       => filename,
+            "parts"      => [{ "text" => chunks.join }],
+          }
+        end
 
-      task = sqlite_store.get(task_id)
+        TASKS[task_id][:history] << {
+          "messageId" => SecureRandom.uuid,
+          "role"      => "ROLE_AGENT",
+          "parts"     => [{ "text" => "Generated #{CODE_FILES.size} files: #{CODE_FILES.keys.join(", ")}" }],
+        }
+
+        TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+        TASKS[task_id][:updated_at] = NOW.()
+      end
+
+      task = LOCK.acquire { TASKS[task_id] }
+
       A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
@@ -178,9 +193,12 @@ agent = A2A::Agent.new do
   end
 
   on "GetTask" do
-    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     respond_with -> (env) {
-      task = env["a2a.task"]
+      request = env["a2a.request"]
+      id = request.id
+
+      task = LOCK.acquire { TASKS[id] }
+      raise A2A::TaskNotFoundError.new(id) unless task
 
       A2A::Schema["Task"].new(
         id:         task[:id],

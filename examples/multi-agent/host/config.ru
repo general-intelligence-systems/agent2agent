@@ -2,8 +2,8 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/store"
 require "a2a/middleware"
+require "async/semaphore"
 require "brute"
 require "console"
 require "securerandom"
@@ -11,7 +11,7 @@ require "async"
 require "json"
 require "yaml"
 
-# ─── Remote Agent Discovery ──────────────────────────────────────────
+# --- Remote Agent Discovery ---
 
 REMOTE_AGENTS = {
   "greeter"    => "http://greeter:9292",
@@ -32,7 +32,9 @@ router_llm = Brute::Agent.new(
   run Brute::Middleware::LLMCall.new
 end
 
-sqlite_store = A2A::Store::SQLite.new(path: "host.db")
+TASKS = {}
+LOCK  = Async::Semaphore.new(1)
+NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 agent = A2A::Agent.new do
   on "SendMessage" do
@@ -46,8 +48,9 @@ agent = A2A::Agent.new do
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
       task_id    = SecureRandom.uuid
 
-      sqlite_store.create(task_id, context_id)
-      sqlite_store.update_state(task_id, "TASK_STATE_WORKING")
+      LOCK.acquire do
+        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_WORKING", updated_at: NOW.(), artifacts: [], history: [] }
+      end
 
       # Step 1: Discover remote agents (lazy, cached)
       REMOTE_AGENTS.each do |name, url|
@@ -89,16 +92,20 @@ agent = A2A::Agent.new do
       end
 
       if chosen_agent.nil?
-        # No suitable agent found — respond directly
+        # No suitable agent found -- respond directly
         artifact = {
           "artifactId" => SecureRandom.uuid,
           "name"       => "response",
           "parts"      => [{ "text" => "I couldn't determine which agent should handle your request: '#{text}'. Available agents are: #{remote_cards.keys.join(", ")}." }],
         }
-        sqlite_store.add_artifact(task_id, artifact)
-        sqlite_store.complete(task_id, nil)
 
-        task = sqlite_store.get(task_id)
+        task = LOCK.acquire do
+          TASKS[task_id][:artifacts] << artifact
+          TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+          TASKS[task_id][:updated_at] = NOW.()
+          TASKS[task_id]
+        end
+
         next A2A::Schema["Send Message Response"].new(
           task: {
             "id"        => task[:id],
@@ -140,13 +147,17 @@ agent = A2A::Agent.new do
           "parts"      => [{ "text" => remote_text }],
           "metadata"   => { "delegatedTo" => chosen_agent, "remoteTaskId" => remote_task.id },
         }
-        sqlite_store.add_artifact(task_id, artifact)
-        sqlite_store.add_message(task_id, {
-          "messageId" => SecureRandom.uuid,
-          "role"      => "ROLE_AGENT",
-          "parts"     => [{ "text" => "[Delegated to #{chosen_agent}] #{remote_text}" }],
-        })
-        sqlite_store.complete(task_id, nil)
+
+        LOCK.acquire do
+          TASKS[task_id][:artifacts] << artifact
+          TASKS[task_id][:history] << {
+            "messageId" => SecureRandom.uuid,
+            "role"      => "ROLE_AGENT",
+            "parts"     => [{ "text" => "[Delegated to #{chosen_agent}] #{remote_text}" }],
+          }
+          TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+          TASKS[task_id][:updated_at] = NOW.()
+        end
       rescue => e
         Console.error(self, "Delegation to #{chosen_agent} failed", e)
 
@@ -155,11 +166,16 @@ agent = A2A::Agent.new do
           "name"       => "error",
           "parts"      => [{ "text" => "Failed to delegate to #{chosen_agent}: #{e.message}" }],
         }
-        sqlite_store.add_artifact(task_id, artifact)
-        sqlite_store.fail(task_id, e.message)
+
+        LOCK.acquire do
+          TASKS[task_id][:artifacts] << artifact
+          TASKS[task_id][:state] = "TASK_STATE_FAILED"
+          TASKS[task_id][:updated_at] = NOW.()
+        end
       end
 
-      task = sqlite_store.get(task_id)
+      task = LOCK.acquire { TASKS[task_id] }
+
       A2A::Schema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
@@ -173,9 +189,12 @@ agent = A2A::Agent.new do
   end
 
   on "GetTask" do
-    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     respond_with -> (env) {
-      task = env["a2a.task"]
+      request = env["a2a.request"]
+      id = request.id
+
+      task = LOCK.acquire { TASKS[id] }
+      raise A2A::TaskNotFoundError.new(id) unless task
 
       A2A::Schema["Task"].new(
         id:         task[:id],
