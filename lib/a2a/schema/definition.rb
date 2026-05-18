@@ -27,6 +27,7 @@ module A2A
       def initialize(hash = {})
         props    = self.class.schema_properties
         snake    = self.class.snake_to_camel_map
+        refs     = self.class.property_refs
         @data    = {}
 
         hash.each do |key, value|
@@ -36,7 +37,13 @@ module A2A
           camel = snake[k] || k
 
           if props.include?(camel)
-            @data[camel] = value.is_a?(Definition) ? value.to_h : value
+            @data[camel] = if value.is_a?(Definition)
+              value.to_h
+            elsif (ref_info = refs[camel])
+              wrap_ref(value, ref_info)
+            else
+              value
+            end
           end
         end
       end
@@ -56,6 +63,10 @@ module A2A
       end
 
       def self.snake_to_camel_map
+        raise "A2A::Schema::Definition should NOT be instantiated directly"
+      end
+
+      def self.property_refs
         raise "A2A::Schema::Definition should NOT be instantiated directly"
       end
 
@@ -93,6 +104,29 @@ module A2A
       end
 
       private
+
+        def wrap_ref(value, ref_info)
+          kind, title = ref_info
+
+          case kind
+          when :object
+            value.is_a?(Hash) ? A2A::Schema[title].new(value) : value
+          when :array
+            if value.is_a?(Array)
+              value.map { |el| el.is_a?(Hash) ? A2A::Schema[title].new(el) : el }
+            else
+              value
+            end
+          when :map
+            if value.is_a?(Hash)
+              value.transform_values { |v| v.is_a?(Hash) ? A2A::Schema[title].new(v) : v }
+            else
+              value
+            end
+          else
+            value
+          end
+        end
 
         def deep_compact(obj)
           case obj

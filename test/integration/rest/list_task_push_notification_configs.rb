@@ -13,7 +13,7 @@ created = client.send_message(
     parts: [{ text: "Hello" }]
   }
 )
-task_id = created.task["id"]
+task_id = created.task.id
 
 client.create_task_push_notification_config(
   task_id: task_id,

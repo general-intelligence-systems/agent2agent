@@ -21,8 +21,8 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 extract_text = ->(message) {
-  parts = message["parts"] || []
-  parts.filter_map { |p| p["text"] }.join("\n")
+  parts = message.parts || []
+  parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
 }
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
@@ -47,7 +47,7 @@ agent = A2A::Agent.new do
       text    = extract_text.(msg)
 
       task_id    = SecureRandom.uuid
-      context_id = msg["contextId"]
+      context_id = msg.context_id
       context_id = SecureRandom.uuid if context_id.to_s.empty?
 
       artifact = {
@@ -57,8 +57,8 @@ agent = A2A::Agent.new do
       }
 
       history = [
-        { "messageId" => msg["messageId"] || SecureRandom.uuid, "role" => "ROLE_USER",  "parts" => [{ "text" => text }] },
-        { "messageId" => SecureRandom.uuid,                     "role" => "ROLE_AGENT", "parts" => [{ "text" => "Echo: #{text}" }] },
+        { "messageId" => msg.message_id || SecureRandom.uuid, "role" => "ROLE_USER",  "parts" => [{ "text" => text }] },
+        { "messageId" => SecureRandom.uuid,                   "role" => "ROLE_AGENT", "parts" => [{ "text" => "Echo: #{text}" }] },
       ]
 
       task = {
@@ -83,7 +83,7 @@ agent = A2A::Agent.new do
       text    = extract_text.(msg)
 
       task_id    = SecureRandom.uuid
-      context_id = msg["contextId"]
+      context_id = msg.context_id
       context_id = SecureRandom.uuid if context_id.to_s.empty?
 
       task = {
@@ -92,7 +92,7 @@ agent = A2A::Agent.new do
         "status"    => { "state" => "TASK_STATE_WORKING", "timestamp" => now_ts.() },
         "artifacts" => [],
         "history"   => [
-          { "messageId" => msg["messageId"] || SecureRandom.uuid, "role" => "ROLE_USER", "parts" => [{ "text" => text }] },
+          { "messageId" => msg.message_id || SecureRandom.uuid, "role" => "ROLE_USER", "parts" => [{ "text" => text }] },
         ],
       }
       TASKS[task_id] = task

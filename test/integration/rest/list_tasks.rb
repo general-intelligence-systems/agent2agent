@@ -13,7 +13,7 @@ created = client.send_message(
     parts: [{ text: "Hello" }]
   }
 )
-context_id = created.task["contextId"]
+context_id = created.task.context_id
 
 result = client.list_tasks(context_id: context_id)
 

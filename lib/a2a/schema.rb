@@ -157,6 +157,7 @@ module A2A
           properties     = raw_definition.fetch("properties", {})
           camel_keys     = properties.keys
           snake_to_camel = build_snake_to_camel(camel_keys)
+          prop_refs      = build_property_refs(properties)
 
           reader_pairs = camel_keys.map { |ck| [camel_to_snake(ck).to_sym, ck] }
 
@@ -165,18 +166,65 @@ module A2A
             @definition_name   = definition_name
             @schema_properties = camel_keys
             @snake_to_camel    = snake_to_camel
+            @property_refs     = prop_refs
 
             class << self
               def schema           = @schema
               def definition_name  = @definition_name
               def schema_properties = @schema_properties
               def snake_to_camel_map = @snake_to_camel
+              def property_refs    = @property_refs
             end
 
             reader_pairs.each do |snake_sym, camel_key|
               define_method(snake_sym) { @data[camel_key] }
             end
           end
+        end
+
+        # Inspect each property's raw schema for $ref pointers and build
+        # a map of { camelKey => [:kind, "Definition Title"] } so that
+        # Definition#initialize can auto-wrap nested Hashes.
+        #
+        # Three patterns:
+        #   :object  — direct $ref        (e.g. task → Task)
+        #   :array   — items.$ref          (e.g. artifacts → [Artifact, ...])
+        #   :map     — additionalProperties.$ref (e.g. securitySchemes → {k => SecurityScheme})
+        def build_property_refs(properties)
+          definitions = raw_schema.fetch("definitions", {})
+          refs = {}
+
+          properties.each do |camel_key, prop_schema|
+            if (ref = prop_schema["$ref"])
+              # Direct $ref — singular nested object
+              title = ref_title_for(ref)
+              if title && definitions.dig(title, "properties")
+                refs[camel_key] = [:object, title]
+              end
+            elsif prop_schema["type"] == "array" && (ref = prop_schema.dig("items", "$ref"))
+              # Array with $ref items
+              title = ref_title_for(ref)
+              if title && definitions.dig(title, "properties")
+                refs[camel_key] = [:array, title]
+              end
+            elsif prop_schema["type"] == "object" && (ref = prop_schema.dig("additionalProperties", "$ref"))
+              # Map with $ref additionalProperties
+              title = ref_title_for(ref)
+              if title && definitions.dig(title, "properties")
+                refs[camel_key] = [:map, title]
+              end
+            end
+          end
+
+          refs
+        end
+
+        # Extract the definition title from an internal $ref pointer.
+        # e.g. "#/definitions/Task%20Status" => "Task Status"
+        def ref_title_for(ref)
+          return nil unless ref.start_with?("#/definitions/")
+
+          URI::DEFAULT_PARSER.unescape(ref.sub("#/definitions/", ""))
         end
 
         def build_snake_to_camel(camel_keys)
@@ -425,5 +473,83 @@ test do
       instance = klass.new
       instance.is_a?(A2A::Schema::Definition).should == true
     end
+  end
+
+  it "auto-wraps nested $ref Hash into Definition (object pattern)" do
+    response = schema["Send Message Response"].new(
+      task: {
+        "id" => "task-123",
+        "contextId" => "ctx-456",
+        "status" => {
+          "state" => "TASK_STATE_SUBMITTED",
+          "timestamp" => "2025-01-01T00:00:00Z"
+        }
+      }
+    )
+    response.task.should.be.kind_of(A2A::Schema::Definition)
+    response.task.id.should == "task-123"
+    response.task.context_id.should == "ctx-456"
+    # Deeply nested: Task.status is also auto-wrapped
+    response.task.status.should.be.kind_of(A2A::Schema::Definition)
+    response.task.status.state.should == "TASK_STATE_SUBMITTED"
+  end
+
+  it "auto-wraps nested $ref arrays into Definitions (array pattern)" do
+    task = schema["Task"].new(
+      id: "task-1",
+      context_id: "ctx-1",
+      history: [
+        { "role" => "ROLE_USER", "messageId" => "msg-1", "parts" => [{ "text" => "Hi" }] },
+        { "role" => "ROLE_AGENT", "messageId" => "msg-2", "parts" => [{ "text" => "Hello" }] }
+      ]
+    )
+    task.history.should.be.kind_of(Array)
+    task.history.length.should == 2
+    task.history[0].should.be.kind_of(A2A::Schema::Definition)
+    task.history[0].role.should == "ROLE_USER"
+    task.history[1].role.should == "ROLE_AGENT"
+  end
+
+  it "preserves to_h serialization after auto-wrapping" do
+    response = schema["Send Message Response"].new(
+      task: {
+        "id" => "task-123",
+        "contextId" => "ctx-456",
+        "status" => {
+          "state" => "TASK_STATE_SUBMITTED",
+          "timestamp" => "2025-01-01T00:00:00Z"
+        }
+      }
+    )
+    h = response.to_h
+    h["task"].should.be.kind_of(Hash)
+    h["task"]["id"].should == "task-123"
+    h["task"]["status"].should.be.kind_of(Hash)
+    h["task"]["status"]["state"].should == "TASK_STATE_SUBMITTED"
+  end
+
+  it "skips wrapping for opaque types without properties (Struct, Timestamp)" do
+    task = schema["Task"].new(
+      id: "task-1",
+      context_id: "ctx-1",
+      metadata: { "foo" => "bar" }
+    )
+    # metadata refs Struct which has no properties — should stay a plain Hash
+    task.metadata.should.be.kind_of(Hash)
+    task.metadata["foo"].should == "bar"
+  end
+
+  it "does not re-wrap values that are already Definition instances" do
+    status = schema["Task Status"].new(
+      state: "TASK_STATE_SUBMITTED",
+      timestamp: "2025-01-01T00:00:00Z"
+    )
+    task = schema["Task"].new(
+      id: "task-1",
+      context_id: "ctx-1",
+      status: status
+    )
+    # Passing a Definition instance should serialize it (existing behavior)
+    task.to_h["status"]["state"].should == "TASK_STATE_SUBMITTED"
   end
 end

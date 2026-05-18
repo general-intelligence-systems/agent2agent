@@ -256,7 +256,7 @@ test do
       end
     end
 
-    lambda { client.get_task(id: "task-123") }.should.raise(RuntimeError)
+    lambda { client.get_task(id: "task-123") }.should.raise(A2A::JsonRpcError)
   end
 
   it "json_rpc: raises ValidationError on invalid params" do
@@ -492,7 +492,7 @@ test do
       end
     end
 
-    lambda { client.get_task(id: "bad-id") }.should.raise(RuntimeError)
+    lambda { client.get_task(id: "bad-id") }.should.raise(A2A::RestError)
   end
 
   it "rest: raises ValidationError on invalid params" do

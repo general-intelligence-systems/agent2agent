@@ -13,7 +13,7 @@ created = client.send_message(
     parts: [{ text: "Hello" }]
   }
 )
-task_id = created.task["id"]
+task_id = created.task.id
 
 begin
   result = client.cancel_task(id: task_id)
