@@ -12,6 +12,10 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 
   - [Getting Started](https://general-intelligence-systems.github.io/agent2agent/guides/getting-started/index) - This guide walks you through installing agent2agent, building a minimal agent, and calling it from both curl and Ruby.
 
+  - [Client — JSON-RPC Binding](https://general-intelligence-systems.github.io/agent2agent/guides/client-json-rpc/index) - This guide covers all 11 protocol operations using the default JSON-RPC binding of `A2A::Client`.
+
+  - [Client — REST Binding](https://general-intelligence-systems.github.io/agent2agent/guides/client-rest/index) - This guide covers all 11 protocol operations using the HTTP+JSON/REST binding of `A2A::Client`.
+
   - [Agent DSL](https://general-intelligence-systems.github.io/agent2agent/guides/agent-dsl/index) - This guide covers the handler DSL for building agents.
 
   - [Streaming](https://general-intelligence-systems.github.io/agent2agent/guides/streaming/index) - This guide covers SSE streaming for real-time task updates and chunked artifact delivery.

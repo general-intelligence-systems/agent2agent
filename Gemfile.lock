@@ -13,9 +13,6 @@ PATH
       rack (~> 3.0)
       scampi
       sqlite3
-    async-http-faraday (0.22.2)
-      async-http (~> 0.42)
-      faraday
 
 GEM
   remote: https://rubygems.org/
@@ -41,6 +38,9 @@ GEM
       traces (~> 0.10)
     async-http-cache (0.4.6)
       async-http (~> 0.56)
+    async-http-faraday (0.22.2)
+      async-http (~> 0.42)
+      faraday
     async-ollama (0.10.3)
       async
       async-rest
@@ -292,7 +292,7 @@ CHECKSUMS
   async-container (0.34.5) sha256=905d950bb4cc5219238214d3a11ac6c4b74d4affecd930027e929ba0b86234bd
   async-http (0.95.0) sha256=08128cab255a48e41d1e856bfa9cbda001f1c57c88bafa3fa3a545ad795754aa
   async-http-cache (0.4.6) sha256=2038d1f093182f16b50b4db271c25085e3938da10bfcfc2904cadb0530fddfd6
-  async-http-faraday (0.22.2)
+  async-http-faraday (0.22.2) sha256=a5ab939c0cf78011668d5bae523978085ce0baedd567b95d0a9cde18bb5603cc
   async-ollama (0.10.3) sha256=105c4c9ba4600851f958dca2a97df955f9e429d77ab8ca33f8805adf4620d4d7
   async-pool (0.11.2) sha256=0a43a17b02b04d9c451b7d12fafa9a50e55dc6dd00d4369aca00433f16a7e3ed
   async-rest (0.20.0) sha256=72b0d467f65269a53a64fc12b828f3d81b4afa201b4eea0b98cddb990e7e95eb
