@@ -1,0 +1,10 @@
+.direnv
+*.gem
+.gem
+.bundler
+refs
+!refs/A2A
+!refs/a2a-specification
+*.swo
+*.swp
+
