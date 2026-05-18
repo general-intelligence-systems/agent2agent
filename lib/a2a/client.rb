@@ -22,12 +22,6 @@ module A2A
   #   # REST
   #   client = A2A::Client.new("http://localhost:9292", binding: :rest)
   #
-  #   card   = client.agent_card
-  #   result = client.send_message(
-  #     message: { "messageId" => "m1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
-  #   )
-  #   task = client.get_task(id: "task-123")
-  #
   class Client
     def initialize(url, binding: :json_rpc, &block)
       @url     = url.chomp("/")
@@ -138,15 +132,24 @@ test do
   it "generates methods for all Proto operations" do
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env| [200, { "content-type" => "application/json" }, JSON.generate({ "jsonrpc" => "2.0", "id" => 1, "result" => {} })] }
+        stub.post("/a2a") { |env|
+          [200, { "content-type" => "application/json" }, JSON.generate({ "jsonrpc" => "2.0", "id" => 1, "result" => {} })]
+        }
       end
     end
 
     expected = %w[
-      send_message send_streaming_message get_task list_tasks cancel_task
-      subscribe_to_task create_task_push_notification_config
-      get_task_push_notification_config list_task_push_notification_configs
-      delete_task_push_notification_config get_extended_agent_card
+      send_message
+      send_streaming_message
+      get_task
+      list_tasks
+      cancel_task
+      subscribe_to_task
+      create_task_push_notification_config
+      get_task_push_notification_config
+      list_task_push_notification_configs
+      delete_task_push_notification_config
+      get_extended_agent_card
     ]
 
     expected.each do |name|
@@ -185,9 +188,13 @@ test do
             "jsonrpc" => "2.0", "id" => parsed["id"],
             "result" => {
               "task" => {
-                "id" => "task-1", "contextId" => "ctx-1",
+                "id" => "task-1",
+                "contextId" => "ctx-1",
                 "status" => { "state" => "TASK_STATE_COMPLETED" },
-                "artifacts" => [{ "artifactId" => "a-1", "parts" => [{ "text" => "Echo: Hello" }] }]
+                "artifacts" => [{
+                  "artifactId" => "a-1",
+                  "parts" => [{ "text" => "Echo: Hello" }]
+                }]
               }
             }
           })]
@@ -196,7 +203,9 @@ test do
     end
 
     result = client.send_message(
-      message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
+      message_id: "msg-1",
+      role: "ROLE_USER",
+      parts: [{ text: "Hello" }] }
     )
     result.should.be.kind_of(A2A::Schema::Definition)
   end
@@ -212,15 +221,18 @@ test do
           [200, { "content-type" => "application/json" }, JSON.generate({
             "jsonrpc" => "2.0", "id" => parsed["id"],
             "result" => {
-              "id" => "task-123", "contextId" => "ctx-456",
-              "status" => { "state" => "TASK_STATE_SUBMITTED" }
+              "id" => "task-123",
+              "contextId" => "ctx-456",
+              "status" => {
+                "state" => "TASK_STATE_SUBMITTED"
+              }
             }
           })]
         }
       end
     end
 
-    result = client.get_task(id: "task-123")
+    result = client.get_task("task-123")
     result.should.be.kind_of(A2A::Schema::Definition)
     result.id.should == "task-123"
     result.context_id.should == "ctx-456"
@@ -231,14 +243,18 @@ test do
       f.adapter :test do |stub|
         stub.post("/a2a") { |env|
           [200, { "content-type" => "application/json" }, JSON.generate({
-            "jsonrpc" => "2.0", "id" => 1,
-            "error" => { "code" => -32600, "message" => "Invalid Request" }
+            "jsonrpc" => "2.0",
+            "id" => 1,
+            "error" => {
+              "code" => -32600,
+              "message" => "Invalid Request"
+            }
           })]
         }
       end
     end
 
-    lambda { client.get_task(id: "task-123") }.should.raise(RuntimeError)
+    lambda { client.get_task("task-123") }.should.raise(RuntimeError)
   end
 
   it "json_rpc: raises ValidationError on invalid params" do
@@ -248,7 +264,7 @@ test do
       end
     end
 
-    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Schema::ValidationError)
+    lambda { client.send_message("not_a_hash") }.should.raise(A2A::Schema::ValidationError)
   end
 
   it "json_rpc: send_streaming_message sends correct method and Accept header" do
@@ -263,7 +279,9 @@ test do
     end
 
     client.send_streaming_message(
-      message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
+      message_id: "msg-1",
+      role: "ROLE_USER",
+      parts: [{ text: "Hello" }]
     ) do |chunk, env|
     end
 
@@ -282,8 +300,11 @@ test do
           captured_env = env
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "task" => {
-              "id" => "task-1", "contextId" => "ctx-1",
-              "status" => { "state" => "TASK_STATE_COMPLETED" }
+              "id" => "task-1",
+              "contextId" => "ctx-1",
+              "status" => {
+                "state" => "TASK_STATE_COMPLETED"
+              }
             }
           })]
         }
@@ -291,7 +312,9 @@ test do
     end
 
     result = client.send_message(
-      message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
+      message_id: "msg-1",
+      role: "ROLE_USER",
+      parts: [{ text: "Hello" }] }
     )
     result.should.be.kind_of(A2A::Schema::Definition)
     captured_env.request_headers["content-type"].should == "application/a2a+json"
@@ -302,8 +325,11 @@ test do
       f.adapter :test do |stub|
         stub.get("/tasks/task-123") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
-            "id" => "task-123", "contextId" => "ctx-456",
-            "status" => { "state" => "TASK_STATE_SUBMITTED" }
+            "id" => "task-123",
+            "contextId" => "ctx-456",
+            "status" => {
+              "state" => "TASK_STATE_SUBMITTED"
+            }
           })]
         }
       end
@@ -343,7 +369,7 @@ test do
       end
     end
 
-    result = client.cancel_task(id: "task-123")
+    result = client.cancel_task("task-123")
     result.should.be.kind_of(A2A::Schema::Definition)
     result.id.should == "task-123"
   end
@@ -415,8 +441,12 @@ test do
       f.adapter :test do |stub|
         stub.get("/extendedAgentCard") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
-            "name" => "Extended Agent", "version" => "2.0.0",
-            "capabilities" => { "streaming" => true, "extendedAgentCard" => true }
+            "name" => "Extended Agent",
+            "version" => "2.0.0",
+            "capabilities" => {
+              "streaming" => true,
+              "extendedAgentCard" => true
+            }
           })]
         }
       end
@@ -438,7 +468,7 @@ test do
       end
     end
 
-    client.subscribe_to_task(id: "task-1") do |chunk, env|
+    client.subscribe_to_task("task-1") do |chunk, env|
     end
 
     captured_env.request_headers["Accept"].should == "text/event-stream"
@@ -449,7 +479,8 @@ test do
       f.adapter :test do |stub|
         stub.get("/tasks/bad-id") { |env|
           [400, { "content-type" => "application/problem+json" }, JSON.generate({
-            "type" => "error", "title" => "Bad Request", "status" => 400
+            "type" => "error",
+            "title" => "Bad Request","status" => 400
           })]
         }
       end
@@ -465,6 +496,6 @@ test do
       end
     end
 
-    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Schema::ValidationError)
+    lambda { client.send_message("not_a_hash") }.should.raise(A2A::Schema::ValidationError)
   end
 end
