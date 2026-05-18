@@ -16,11 +16,6 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.text }.join("\n")
-}
-
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 terminal_states = A2A::Store::SQLite::TERMINAL_STATES
@@ -41,10 +36,11 @@ agent = A2A::Agent.new do
   # for each state transition and artifact.
   #
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       context_id = msg.context_id
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id

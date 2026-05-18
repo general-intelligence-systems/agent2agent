@@ -12,11 +12,6 @@ require "yaml"
 
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.text }.join("\n")
-}
-
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 # Simulated code files — each split into chunks for streaming
@@ -50,10 +45,11 @@ agent = A2A::Agent.new do
   #   artifactUpdate { append: true,  lastChunk: true  }  — final chunk
   #
   on "SendStreamingMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       context_id = msg.context_id
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
@@ -166,10 +162,11 @@ agent = A2A::Agent.new do
   end
 
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       context_id = msg.context_id
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id

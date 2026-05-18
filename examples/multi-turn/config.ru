@@ -10,11 +10,6 @@ require "yaml"
 
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.text }.join("\n")
-}
-
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 terminal_states = A2A::Store::SQLite::TERMINAL_STATES
@@ -30,10 +25,11 @@ agent = A2A::Agent.new do
   #   2. Continuation (taskId present): check if user confirmed, then complete or re-ask
   #
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       task_id    = msg.task_id
       context_id = msg.context_id
@@ -155,7 +151,7 @@ agent = A2A::Agent.new do
 
   on "GetTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
-    use A2A::Middleware::HistoryLength
+    use A2A::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       task    = env["a2a.task"]
       history = env["a2a.history"]

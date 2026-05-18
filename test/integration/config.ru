@@ -3,6 +3,7 @@
 require "bundler/setup"
 require "a2a"
 require "a2a/sse"
+require "a2a/middleware"
 require "console"
 require "securerandom"
 require "yaml"
@@ -20,11 +21,6 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.respond_to?(:text) ? p.text : p["text"] }.join("\n")
-}
-
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 make_stream = ->(env) {
@@ -41,10 +37,11 @@ agent = A2A::Agent.new do
 
   # ── SendMessage ────────────────────────────────────────────────────
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with ->(env) {
       request = env["a2a.request"]
       msg     = request.message
-      text    = extract_text.(msg)
+      text    = env["a2a.message"]
 
       task_id    = SecureRandom.uuid
       context_id = msg.context_id
@@ -77,10 +74,11 @@ agent = A2A::Agent.new do
 
   # ── SendStreamingMessage ───────────────────────────────────────────
   on "SendStreamingMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with ->(env) {
       request = env["a2a.request"]
       msg     = request.message
-      text    = extract_text.(msg)
+      text    = env["a2a.message"]
 
       task_id    = SecureRandom.uuid
       context_id = msg.context_id

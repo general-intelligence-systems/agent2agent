@@ -22,11 +22,6 @@ remote_cards = {}
 
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.text }.join("\n")
-}
-
 router_llm = Brute::Agent.new(
   provider: Brute.provider,
   model:    ENV.fetch("MODEL", "claude-sonnet-4-20250514"),
@@ -41,10 +36,11 @@ sqlite_store = A2A::Store::SQLite.new(path: "host.db")
 
 agent = A2A::Agent.new do
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       context_id = msg.context_id
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id

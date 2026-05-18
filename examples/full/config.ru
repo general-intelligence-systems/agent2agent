@@ -10,14 +10,7 @@ require "securerandom"
 require "async"
 require "yaml"
 
-# ─── Agent Card (spec-compliant) ──────────────────────────────────────
-
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
-
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.text }.join("\n")
-}
 
 now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
@@ -28,10 +21,11 @@ sqlite_store = A2A::Store::SQLite.new(path: "echo_agent.db")
 agent = A2A::Agent.new do
 
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       task_id    = msg.task_id
       context_id = msg.context_id
@@ -98,10 +92,11 @@ agent = A2A::Agent.new do
   # Uses A2A::SSE::Stream (Protocol::HTTP::Body::Writable) — no threads.
   #
   on "SendStreamingMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       context_id = msg.context_id
       message_id = msg.message_id
@@ -116,13 +111,11 @@ agent = A2A::Agent.new do
       })
       sqlite_store.update_state(task_id, "TASK_STATE_WORKING")
 
-      # Create the SSE stream — binding-aware (JsonRpc or Rest)
-      s = if env["a2a.json_rpc_id"]
-        A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
+      if env["a2a.json_rpc_id"]
+        s = env["a2a.stream"] = A2A::SSE::JsonRpcStream.new(json_rpc_id: env["a2a.json_rpc_id"])
       else
-        A2A::SSE::RestStream.new
+        s = env["a2a.stream"] = A2A::SSE::RestStream.new
       end
-      env["a2a.stream"] = s
 
       # Emit events in a background fiber — no threads, pure async
       Async do
@@ -186,7 +179,7 @@ agent = A2A::Agent.new do
 
   on "GetTask" do
     use A2A::Middleware::FetchTask, store: sqlite_store
-    use A2A::Middleware::HistoryLength
+    use A2A::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       task    = env["a2a.task"]
       history = env["a2a.history"]
@@ -204,7 +197,7 @@ agent = A2A::Agent.new do
   end
 
   on "ListTasks" do
-    use A2A::Middleware::PageSize
+    use A2A::Middleware::LimitPaginationSize, 50
     respond_with -> (env) {
       request    = env["a2a.request"]
       page_size  = env["a2a.page_size"]

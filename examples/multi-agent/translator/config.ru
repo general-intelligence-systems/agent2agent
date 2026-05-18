@@ -3,6 +3,7 @@
 require "bundler/setup"
 require "a2a"
 require "a2a/store"
+require "a2a/middleware"
 require "brute"
 require "console"
 require "securerandom"
@@ -13,11 +14,6 @@ require "yaml"
 agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
-
-extract_text = ->(message) {
-  parts = message.parts || []
-  parts.filter_map { |p| p.text }.join("\n")
-}
 
 # ─── Brute Agent (LLM-powered) ───────────────────────────────────────
 
@@ -39,10 +35,11 @@ sqlite_store = A2A::Store::SQLite.new(path: "translator.db")
 
 agent = A2A::Agent.new do
   on "SendMessage" do
+    use A2A::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
-      text = extract_text.(msg)
+      text = env["a2a.message"]
 
       context_id = msg.context_id
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
