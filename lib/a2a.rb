@@ -22,4 +22,9 @@ require "a2a/agent"
 
 require "a2a/server"
 
+require "a2a/faraday/middleware/schema_request"
+require "a2a/faraday/middleware/json_rpc/request"
+require "a2a/faraday/middleware/json_rpc/response"
+require "a2a/faraday/middleware/rest/request"
+require "a2a/faraday/middleware/rest/response"
 require "a2a/client"

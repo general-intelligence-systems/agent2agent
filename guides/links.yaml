@@ -1,32 +1,36 @@
 getting-started:
   order: 1
-agent-dsl:
+client-json-rpc:
   order: 2
-streaming:
+client-rest:
   order: 3
-multi-turn:
+agent-dsl:
   order: 4
-async-jobs:
+streaming:
   order: 5
-task-stores:
+multi-turn:
   order: 6
-schema-validation:
+async-jobs:
   order: 7
-protocol-operations:
+task-stores:
   order: 8
-tracing:
+schema-validation:
   order: 9
-examples-basic:
+protocol-operations:
   order: 10
-examples-multi-turn:
+tracing:
   order: 11
-examples-async-jobs:
+examples-basic:
   order: 12
-examples-streaming:
+examples-multi-turn:
   order: 13
-examples-push-notifications:
+examples-async-jobs:
   order: 14
-examples-multi-agent:
+examples-streaming:
   order: 15
-examples-full:
+examples-push-notifications:
   order: 16
+examples-multi-agent:
+  order: 17
+examples-full:
+  order: 18
