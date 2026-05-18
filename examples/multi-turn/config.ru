@@ -153,18 +153,16 @@ agent = A2A::Agent.new do
     use A2A::Middleware::FetchTask, store: sqlite_store
     use A2A::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
-      task    = env["a2a.task"]
-      history = env["a2a.history"]
+      task  = env["a2a.task"]
+      limit = env["a2a.history_length"]
 
-      result = {
-        "id"        => task[:id],
-        "contextId" => task[:context_id],
-        "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-        "artifacts" => task[:artifacts],
-      }
-      result["history"] = history if history
-
-      A2A::Schema["Task"].new(result)
+      A2A::Schema["Task"].new(
+        id:         task[:id],
+        context_id: task[:context_id],
+        status:     { state: task[:state], timestamp: task[:updated_at] },
+        artifacts:  task[:artifacts],
+        history:    task[:history]&.last(limit),
+      )
     }
   end
 end

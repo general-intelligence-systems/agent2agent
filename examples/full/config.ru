@@ -153,26 +153,26 @@ agent = A2A::Agent.new do
     use A2A::Middleware::FetchTask, store: sqlite_store
     use A2A::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
-      task    = env["a2a.task"]
-      history = env["a2a.history"]
+      task  = env["a2a.task"]
+      limit = env["a2a.history_length"]
 
-      result = {
-        "id"        => task[:id],
-        "contextId" => task[:context_id],
-        "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-        "artifacts" => task[:artifacts],
-      }
-      result["history"] = history if history
-
-      A2A::Schema["Task"].new(result)
+      A2A::Schema["Task"].new(
+        id:         task[:id],
+        context_id: task[:context_id],
+        status:     { state: task[:state], timestamp: task[:updated_at] },
+        artifacts:  task[:artifacts],
+        history:    task[:history]&.last(limit),
+      )
     }
   end
 
   on "ListTasks" do
     use A2A::Middleware::LimitPaginationSize, 50
+    use A2A::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       request    = env["a2a.request"]
       page_size  = env["a2a.page_size"]
+      limit      = env["a2a.history_length"]
       context_id = request.context_id
       status     = request.status
       context_id = nil if context_id.to_s.empty?
@@ -192,11 +192,6 @@ agent = A2A::Agent.new do
 
       include_artifacts = !!request.include_artifacts
 
-      history_length = nil
-      if request.history_length
-        history_length = request.history_length.to_i
-      end
-
       tasks_json = page.map do |t|
         task_h = {
           "id"        => t[:id],
@@ -204,11 +199,7 @@ agent = A2A::Agent.new do
           "status"    => { "state" => t[:state], "timestamp" => t[:updated_at] },
         }
         task_h["artifacts"] = t[:artifacts] if include_artifacts
-        if history_length.nil?
-          task_h["history"] = t[:history]
-        elsif history_length > 0
-          task_h["history"] = t[:history].last(history_length)
-        end
+        task_h["history"] = t[:history]&.last(limit)
         task_h
       end
 
