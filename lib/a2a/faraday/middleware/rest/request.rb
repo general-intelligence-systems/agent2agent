@@ -31,10 +31,14 @@ module A2A
             env.method = operation.rest_verb.to_sym
 
             if [:get, :delete].include?(env.method)
+              env.params ||= {}
               remaining.each { |k, v| env.params[k.to_s] = v }
               env.body = nil
             else
-              env.body = remaining
+              # Serialize to JSON here rather than relying on Faraday's
+              # built-in :json middleware, which only recognizes
+              # application/json and application/vnd.*+json content types.
+              env.body = remaining.is_a?(String) ? remaining : JSON.generate(remaining)
               env.request_headers["content-type"] = "application/a2a+json"
             end
           end
@@ -95,7 +99,7 @@ test do
 
     env.url.path.should == "/message:send"
     env.method.should == :post
-    env.body.should == { "message" => { "role" => "ROLE_USER" } }
+    JSON.parse(env.body).should == { "message" => { "role" => "ROLE_USER" } }
     env.request_headers["content-type"].should == "application/a2a+json"
   end
 
@@ -148,7 +152,7 @@ test do
 
     env.url.path.should == "/tasks/task-123:cancel"
     env.method.should == :post
-    env.body.should == { "metadata" => { "key" => "val" } }
+    JSON.parse(env.body).should == { "metadata" => { "key" => "val" } }
   end
 
   it "passes through when no operation is set" do

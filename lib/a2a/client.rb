@@ -84,7 +84,6 @@ module A2A
         ::Faraday.new(url: @url) do |f|
           f.request :a2a_schema
           f.request :a2a_rest
-          f.request :json
 
           f.response :a2a_rest
           f.response :json
