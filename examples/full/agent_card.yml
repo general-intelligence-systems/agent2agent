@@ -1,0 +1,32 @@
+name: Full Echo Agent
+description: A2A echo agent demonstrating all 11 protocol operations.
+version: "1.0.0"
+supportedInterfaces:
+  - url: http://localhost:9292/a2a
+    protocolBinding: JSONRPC
+    protocolVersion: "1.0"
+  - url: http://localhost:9292
+    protocolBinding: HTTP+JSON
+    protocolVersion: "1.0"
+capabilities:
+  streaming: true
+  pushNotifications: true
+  extendedAgentCard: false
+defaultInputModes:
+  - text/plain
+defaultOutputModes:
+  - text/plain
+skills:
+  - id: echo
+    name: Echo
+    description: Echoes user messages back as task artifacts.
+    tags:
+      - echo
+      - test
+    examples:
+      - Say hello
+      - Echo this message
+    inputModes:
+      - text/plain
+    outputModes:
+      - text/plain

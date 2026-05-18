@@ -6,41 +6,11 @@ require "a2a"
 require "a2a/store"
 require "console"
 require "securerandom"
+require "yaml"
 
 # ─── Agent Card ────────────────────────────────────────────────────────
 
-agent_card = {
-  "name"               => "Research Planner",
-  "description"        => "A multi-turn agent that plans research and asks for confirmation before proceeding.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://localhost:9292/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-    {
-      "url"             => "http://localhost:9292",
-      "protocolBinding" => "HTTP+JSON",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => false,
-    "pushNotifications" => false,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain"],
-  "skills" => [
-    {
-      "id"          => "research",
-      "name"        => "Research Planner",
-      "description" => "Plans research on a topic and asks for user confirmation before executing.",
-      "tags"        => ["research", "planning", "multi-turn"],
-      "examples"    => ["Research quantum computing", "Investigate Ruby concurrency models"],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 

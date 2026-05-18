@@ -4,13 +4,9 @@ require "bundler/setup"
 require "scampi"
 require "a2a"
 require "console"
+require "yaml"
 
-agent_card = {
-  "name"        => "Echo Agent",
-  "description" => "A simple echo agent that repeats your message.",
-  "url"         => "http://localhost:9292",
-  "version"     => "1.0.0",
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 agent = A2A::Agent.new do
   on "SendMessage" do |request|

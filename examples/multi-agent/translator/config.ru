@@ -7,36 +7,11 @@ require "a2a/store"
 require "brute"
 require "console"
 require "securerandom"
+require "yaml"
 
 # ─── Agent Card ────────────────────────────────────────────────────────
 
-agent_card = {
-  "name"               => "Translator Agent",
-  "description"        => "Translates text into different languages.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://translator:9293/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => false,
-    "pushNotifications" => false,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain"],
-  "skills" => [
-    {
-      "id"          => "translate",
-      "name"        => "Language Translator",
-      "description" => "Translates text into a specified language. Provide the text and target language.",
-      "tags"        => ["translation", "language", "i18n"],
-      "examples"    => ["Translate 'Hello world' to Spanish", "Say 'Good morning' in Japanese", "Translate this to French: I love programming"],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 

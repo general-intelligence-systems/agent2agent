@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+#
+# Integration test runner.
+#
+# Starts the A2A echo agent via docker compose, then runs each test
+# script in json_rpc/ and rest/ against it using the A2A::Client.
+#
+# Usage:
+#   test/integration/run              # run tests (builds if needed)
+#   test/integration/run --build      # force rebuild before testing
+#
+set -euo pipefail
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$DIR/../.." && pwd)"
+COMPOSE_FILE="$DIR/docker-compose.yml"
+BASE="http://localhost:9292"
+PASS=0
+FAIL=0
+ERRORS=""
+
+# ── Colours ───────────────────────────────────────────────────────────
+
+red()   { printf "\033[31m%s\033[0m" "$*"; }
+green() { printf "\033[32m%s\033[0m" "$*"; }
+bold()  { printf "\033[1m%s\033[0m"  "$*"; }
+
+# ── Lifecycle ─────────────────────────────────────────────────────────
+
+cleanup() {
+  echo ""
+  echo "Tearing down..."
+  docker compose -f "$COMPOSE_FILE" down --timeout 5 2>/dev/null || true
+}
+trap cleanup EXIT
+
+startup() {
+  local build_flag=""
+  if [ "${1:-}" = "--build" ]; then
+    build_flag="--build"
+  fi
+
+  echo "Starting docker compose..."
+  docker compose -f "$COMPOSE_FILE" up -d $build_flag 2>&1
+
+  echo "Waiting for server..."
+  local attempts=0
+  while ! curl -sf "$BASE/.well-known/agent-card.json" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge 60 ]; then
+      echo "$(red "Server failed to start after 60s")"
+      docker compose -f "$COMPOSE_FILE" logs
+      exit 1
+    fi
+    sleep 1
+  done
+  echo "Server is up."
+  echo ""
+}
+
+# ── Test runner ───────────────────────────────────────────────────────
+
+run_script() {
+  local script="$1"
+  local label="${script#$DIR/}"
+
+  if bundle exec ruby "$script" >/dev/null 2>&1; then
+    PASS=$((PASS + 1))
+    echo "  $(green "PASS") $label"
+  else
+    FAIL=$((FAIL + 1))
+    ERRORS="${ERRORS}\n  FAIL: ${label}"
+    echo "  $(red "FAIL") $label"
+    # Re-run to show error output
+    bundle exec ruby "$script" 2>&1 | sed 's/^/         /' || true
+  fi
+}
+
+# ── Main ──────────────────────────────────────────────────────────────
+
+main() {
+  echo ""
+  echo "$(bold "A2A Integration Tests")"
+  echo "====================="
+  echo ""
+
+  startup "${1:-}"
+
+  bold "JSON-RPC"; echo ""
+  for script in "$DIR"/json_rpc/*.rb; do
+    run_script "$script"
+  done
+  echo ""
+
+  bold "REST"; echo ""
+  for script in "$DIR"/rest/*.rb; do
+    run_script "$script"
+  done
+  echo ""
+
+  # Summary
+  echo "====================="
+  local total=$((PASS + FAIL))
+  echo "$(bold "Results:") $(green "$PASS passed"), $(red "$FAIL failed") / $total total"
+
+  if [ "$FAIL" -gt 0 ]; then
+    echo ""
+    echo "$(red "Failures:")"
+    echo -e "$ERRORS"
+    echo ""
+    exit 1
+  fi
+
+  echo ""
+  exit 0
+}
+
+main "$@"

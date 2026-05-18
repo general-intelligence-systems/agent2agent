@@ -9,6 +9,7 @@ require "console"
 require "securerandom"
 require "async"
 require "json"
+require "yaml"
 
 # ─── Remote Agent Discovery ──────────────────────────────────────────
 
@@ -22,38 +23,7 @@ remote_cards = {}
 
 # ─── Agent Card ────────────────────────────────────────────────────────
 
-agent_card = {
-  "name"               => "Host Orchestrator",
-  "description"        => "An LLM-powered orchestrator that discovers remote agents and delegates tasks to the most appropriate one.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://localhost:9294/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => false,
-    "pushNotifications" => false,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain"],
-  "skills" => [
-    {
-      "id"          => "orchestrate",
-      "name"        => "Multi-Agent Orchestrator",
-      "description" => "Routes user requests to the most appropriate remote agent. Available agents: Greeter (creative greetings) and Translator (language translation).",
-      "tags"        => ["orchestration", "multi-agent", "routing"],
-      "examples"    => [
-        "Greet Alice for her birthday",
-        "Translate 'Hello' to French",
-        "Welcome the new team member Bob",
-        "Say 'Good morning' in Japanese",
-      ],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 

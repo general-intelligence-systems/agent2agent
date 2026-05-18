@@ -1,0 +1,4 @@
+name: Echo Agent
+description: A simple echo agent that repeats your message.
+url: http://localhost:9292
+version: "1.0.0"

@@ -8,44 +8,11 @@ require "a2a/store"
 require "console"
 require "securerandom"
 require "async"
+require "yaml"
 
 # ─── Agent Card (spec-compliant) ──────────────────────────────────────
 
-agent_card = {
-  "name"               => "Full Echo Agent",
-  "description"        => "A2A echo agent demonstrating all 11 protocol operations.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://localhost:9292/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-    {
-      "url"             => "http://localhost:9292",
-      "protocolBinding" => "HTTP+JSON",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => true,
-    "pushNotifications" => true,
-    "extendedAgentCard" => false,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain"],
-  "skills" => [
-    {
-      "id"          => "echo",
-      "name"        => "Echo",
-      "description" => "Echoes user messages back as task artifacts.",
-      "tags"        => ["echo", "test"],
-      "examples"    => ["Say hello", "Echo this message"],
-      "inputModes"  => ["text/plain"],
-      "outputModes" => ["text/plain"],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 extract_text = ->(message) {
   parts = message["parts"] || []

@@ -1,0 +1,29 @@
+name: Integration Test Agent
+description: A2A agent for integration testing.
+version: "1.0.0"
+supportedInterfaces:
+  - url: http://localhost:9292/a2a
+    protocolBinding: JSONRPC
+    protocolVersion: "1.0"
+  - url: http://localhost:9292
+    protocolBinding: HTTP+JSON
+    protocolVersion: "1.0"
+capabilities:
+  streaming: true
+  pushNotifications: true
+  extendedAgentCard: false
+defaultInputModes:
+  - text/plain
+defaultOutputModes:
+  - text/plain
+skills:
+  - id: echo
+    name: Echo
+    description: Echoes user messages back.
+    tags:
+      - echo
+      - test
+    inputModes:
+      - text/plain
+    outputModes:
+      - text/plain

@@ -8,41 +8,11 @@ require "a2a/store"
 require "console"
 require "securerandom"
 require "async"
+require "yaml"
 
 # ─── Agent Card ────────────────────────────────────────────────────────
 
-agent_card = {
-  "name"               => "Webhook Worker",
-  "description"        => "An async agent that delivers task updates via push notification webhooks.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://localhost:9292/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-    {
-      "url"             => "http://localhost:9292",
-      "protocolBinding" => "HTTP+JSON",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => true,
-    "pushNotifications" => true,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain"],
-  "skills" => [
-    {
-      "id"          => "process",
-      "name"        => "Background Processor",
-      "description" => "Processes tasks asynchronously and delivers updates via push notification webhooks.",
-      "tags"        => ["async", "webhooks", "push-notifications"],
-      "examples"    => ["Process this data", "Run analysis"],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 

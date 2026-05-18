@@ -8,41 +8,11 @@ require "a2a/store"
 require "console"
 require "securerandom"
 require "async"
+require "yaml"
 
 # ─── Agent Card ────────────────────────────────────────────────────────
 
-agent_card = {
-  "name"               => "Code Generator",
-  "description"        => "Streams generated code files as chunked artifacts.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://localhost:9292/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-    {
-      "url"             => "http://localhost:9292",
-      "protocolBinding" => "HTTP+JSON",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => true,
-    "pushNotifications" => false,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain", "application/json"],
-  "skills" => [
-    {
-      "id"          => "codegen",
-      "name"        => "Code Generator",
-      "description" => "Generates code files for a given topic, streaming each file in chunks.",
-      "tags"        => ["code", "streaming", "generator"],
-      "examples"    => ["Generate a web app", "Create a REST API"],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 

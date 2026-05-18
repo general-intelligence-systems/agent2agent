@@ -7,36 +7,11 @@ require "a2a/store"
 require "brute"
 require "console"
 require "securerandom"
+require "yaml"
 
 # ─── Agent Card ────────────────────────────────────────────────────────
 
-agent_card = {
-  "name"               => "Greeter Agent",
-  "description"        => "Generates creative, personalized greetings for any occasion.",
-  "version"            => "1.0.0",
-  "supportedInterfaces" => [
-    {
-      "url"             => "http://greeter:9292/a2a",
-      "protocolBinding" => "JSONRPC",
-      "protocolVersion" => "1.0",
-    },
-  ],
-  "capabilities" => {
-    "streaming"         => false,
-    "pushNotifications" => false,
-  },
-  "defaultInputModes"  => ["text/plain"],
-  "defaultOutputModes" => ["text/plain"],
-  "skills" => [
-    {
-      "id"          => "greet",
-      "name"        => "Creative Greeter",
-      "description" => "Generates creative, warm greetings. Give a name, occasion, or mood and get a personalized greeting back.",
-      "tags"        => ["greeting", "creative", "personalized"],
-      "examples"    => ["Greet Alice for her birthday", "Say hello to the team", "Welcome a new employee named Bob"],
-    },
-  ],
-}
+agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 
 # ─── Helpers ──────────────────────────────────────────────────────────
 
