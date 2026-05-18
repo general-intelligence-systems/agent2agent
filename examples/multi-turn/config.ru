@@ -3,6 +3,7 @@
 require "bundler/setup"
 require "a2a"
 require "a2a/store"
+require "a2a/middleware"
 require "console"
 require "securerandom"
 require "yaml"
@@ -162,17 +163,11 @@ agent = A2A::Agent.new do
 
   # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
+    use A2A::Middleware::FetchTask, store: sqlite_store
+    use A2A::Middleware::HistoryLength
     respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
-      task = sqlite_store.get(id)
-      raise A2A::TaskNotFoundError.new(id) unless task
-
-      history = task[:history]
-      if request.history_length
-        hl = request.history_length.to_i
-        history = hl == 0 ? nil : history.last(hl)
-      end
+      task    = env["a2a.task"]
+      history = env["a2a.history"]
 
       result = {
         "id"        => task[:id],

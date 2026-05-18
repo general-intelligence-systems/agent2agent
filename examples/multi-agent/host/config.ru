@@ -3,6 +3,7 @@
 require "bundler/setup"
 require "a2a"
 require "a2a/store"
+require "a2a/middleware"
 require "brute"
 require "console"
 require "securerandom"
@@ -188,11 +189,9 @@ agent = A2A::Agent.new do
 
   # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
+    use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
-      task = sqlite_store.get(id)
-      raise A2A::TaskNotFoundError.new(id) unless task
+      task = env["a2a.task"]
 
       A2A::Schema["Task"].new(
         id:         task[:id],

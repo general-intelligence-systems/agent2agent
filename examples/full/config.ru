@@ -4,6 +4,7 @@ require "bundler/setup"
 require "a2a"
 require "a2a/sse"
 require "a2a/store"
+require "a2a/middleware"
 require "console"
 require "securerandom"
 require "async"
@@ -187,17 +188,11 @@ agent = A2A::Agent.new do
 
   # ── 3. GetTask ──────────────────────────────────────────────────────
   on "GetTask" do
+    use A2A::Middleware::FetchTask, store: sqlite_store
+    use A2A::Middleware::HistoryLength
     respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
-      task = sqlite_store.get(id)
-      raise A2A::TaskNotFoundError.new(id) unless task
-
-      history = task[:history]
-      if request.history_length
-        hl = request.history_length.to_i
-        history = hl == 0 ? nil : history.last(hl)
-      end
+      task    = env["a2a.task"]
+      history = env["a2a.history"]
 
       result = {
         "id"        => task[:id],
@@ -213,18 +208,14 @@ agent = A2A::Agent.new do
 
   # ── 4. ListTasks ────────────────────────────────────────────────────
   on "ListTasks" do
+    use A2A::Middleware::PageSize
     respond_with -> (env) {
-      request = env["a2a.request"]
+      request    = env["a2a.request"]
+      page_size  = env["a2a.page_size"]
       context_id = request.context_id
       status     = request.status
       context_id = nil if context_id.to_s.empty?
       status     = nil if status.to_s.empty?
-
-      page_size = 50
-      if request.page_size
-        ps = request.page_size.to_i
-        page_size = [[ps, 1].max, 100].min
-      end
 
       all_tasks = sqlite_store.list(context_id: context_id, state: status)
       total_size = all_tasks.size
@@ -271,11 +262,10 @@ agent = A2A::Agent.new do
 
   # ── 5. CancelTask ──────────────────────────────────────────────────
   on "CancelTask" do
+    use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
-      task = sqlite_store.get(id)
-      raise A2A::TaskNotFoundError.new(id) unless task
+      task = env["a2a.task"]
+      id   = task[:id]
       raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if terminal_states.include?(task[:state])
 
       sqlite_store.cancel(id)
@@ -294,11 +284,10 @@ agent = A2A::Agent.new do
   # No threads — pure fiber-based cooperative concurrency.
   #
   on "SubscribeToTask" do
+    use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
-      task = sqlite_store.get(id)
-      raise A2A::TaskNotFoundError.new(id) unless task
+      task = env["a2a.task"]
+      id   = task[:id]
       raise A2A::UnsupportedOperationError.new(message: "Cannot subscribe to a task in a terminal state") if terminal_states.include?(task[:state])
 
       sub_queue = sqlite_store.subscribe(id)
@@ -351,11 +340,10 @@ agent = A2A::Agent.new do
 
   # ── 7. CreateTaskPushNotificationConfig ─────────────────────────────
   on "CreateTaskPushNotificationConfig" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
       request = env["a2a.request"]
-      task_id = request.task_id
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
+      task_id = env["a2a.task"][:id]
 
       request.to_h.then do |config_data|
         config_data.delete("taskId")
@@ -370,13 +358,11 @@ agent = A2A::Agent.new do
 
   # ── 8. GetTaskPushNotificationConfig ────────────────────────────────
   on "GetTaskPushNotificationConfig" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id   = request.task_id
+      request   = env["a2a.request"]
+      task_id   = env["a2a.task"][:id]
       config_id = request.id
-
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
 
       config = sqlite_store.get_push_config(task_id, config_id)
       raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
@@ -386,11 +372,9 @@ agent = A2A::Agent.new do
   end
 
   on "ListTaskPushNotificationConfigs" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id = request.task_id
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
+      task_id = env["a2a.task"][:id]
 
       sqlite_store.list_push_configs(task_id).then do |configs|
         A2A::Schema["List Task Push Notification Configs Response"].new(
@@ -403,13 +387,11 @@ agent = A2A::Agent.new do
 
   # ── 10. DeleteTaskPushNotificationConfig ────────────────────────────
   on "DeleteTaskPushNotificationConfig" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id   = request.task_id
+      request   = env["a2a.request"]
+      task_id   = env["a2a.task"][:id]
       config_id = request.id
-
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
 
       sqlite_store.delete_push_config(task_id, config_id)
       nil

@@ -4,6 +4,7 @@ require "bundler/setup"
 require "a2a"
 require "a2a/sse"
 require "a2a/store"
+require "a2a/middleware"
 require "console"
 require "securerandom"
 require "async"
@@ -65,7 +66,6 @@ agent = A2A::Agent.new do
       })
 
       # Process in background — each state change triggers webhook delivery
-      # via sqlite_store.update_state -> sqlite_store.webhooks.deliver
       processor.call do
         sqlite_store.update_state(task_id, "TASK_STATE_WORKING", message: {
           "messageId" => SecureRandom.uuid,
@@ -113,11 +113,9 @@ agent = A2A::Agent.new do
 
   # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
+    use A2A::Middleware::FetchTask, store: sqlite_store
     respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
-      task = sqlite_store.get(id)
-      raise A2A::TaskNotFoundError.new(id) unless task
+      task = env["a2a.task"]
 
       A2A::Schema["Task"].new(
         id:         task[:id],
@@ -132,11 +130,10 @@ agent = A2A::Agent.new do
   # ── Push Notification Config CRUD ────────────────────────────────────
 
   on "CreateTaskPushNotificationConfig" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
       request = env["a2a.request"]
-      task_id = request.task_id
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
+      task_id = env["a2a.task"][:id]
 
       config_data = request.to_h
       config_data.delete("taskId")
@@ -148,13 +145,11 @@ agent = A2A::Agent.new do
   end
 
   on "GetTaskPushNotificationConfig" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id   = request.task_id
+      request   = env["a2a.request"]
+      task_id   = env["a2a.task"][:id]
       config_id = request.id
-
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
 
       config = sqlite_store.get_push_config(task_id, config_id)
       raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
@@ -164,11 +159,9 @@ agent = A2A::Agent.new do
   end
 
   on "ListTaskPushNotificationConfigs" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id = request.task_id
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
+      task_id = env["a2a.task"][:id]
 
       configs = sqlite_store.list_push_configs(task_id)
       A2A::Schema["List Task Push Notification Configs Response"].new(
@@ -179,13 +172,11 @@ agent = A2A::Agent.new do
   end
 
   on "DeleteTaskPushNotificationConfig" do
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
-      request = env["a2a.request"]
-      task_id   = request.task_id
+      request   = env["a2a.request"]
+      task_id   = env["a2a.task"][:id]
       config_id = request.id
-
-      task = sqlite_store.get(task_id)
-      raise A2A::TaskNotFoundError.new(task_id) unless task
 
       sqlite_store.delete_push_config(task_id, config_id)
       nil
