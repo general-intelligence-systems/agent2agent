@@ -11,8 +11,8 @@ The `agent2agent` gem ships trace providers that instrument the request lifecycl
 | `a2a.server.call` | `A2A::Server` | `http.method`, `http.path`, `http.status_code` |
 | `a2a.server.triage.call` | `A2A::Server::Triage` | `a2a.operation`, `a2a.proto_operation` |
 | `a2a.server.dispatcher.call` | `A2A::Server::Dispatcher` | `a2a.operation`, `http.status_code`, `a2a.response_type` |
-| `a2a.bindings.json_rpc.call` | `A2A::Bindings::JsonRpc` | `rpc.method`, `rpc.jsonrpc.request_id`, `a2a.response_type` |
-| `a2a.bindings.rest.call` | `A2A::Bindings::Rest` | `a2a.verb`, `a2a.path`, `a2a.response_type` |
+| `a2a.bindings.json_rpc.call` | `A2A::Server::Bindings::JsonRpc` | `rpc.method`, `rpc.jsonrpc.request_id`, `a2a.response_type` |
+| `a2a.bindings.rest.call` | `A2A::Server::Bindings::Rest` | `a2a.verb`, `a2a.path`, `a2a.response_type` |
 
 When no backend is configured, tracing is a zero-cost no-op -- the provider blocks are never evaluated.
 

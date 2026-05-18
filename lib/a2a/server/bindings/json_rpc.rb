@@ -5,8 +5,9 @@ require "a2a"
 require "a2a/sse"
 
 module A2A
-  module Bindings
-    # Rack middleware implementing the A2A JSON-RPC 2.0 protocol binding.
+  class Server
+    module Bindings
+      # Rack middleware implementing the A2A JSON-RPC 2.0 protocol binding.
     #
     # Strips the JSON-RPC envelope from the inbound request, setting
     # env keys for the method name, request id, and parsed params.
@@ -77,6 +78,7 @@ module A2A
           [200, { "content-type" => "application/json" },
            [JSON.generate(jsonrpc: "2.0", id: id, error: err)]]
         end
+    end
     end
   end
 end

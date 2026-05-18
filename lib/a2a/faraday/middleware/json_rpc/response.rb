@@ -32,8 +32,8 @@ module A2A
             end
 
             # Handle JSON-RPC error responses
-            if parsed.is_a?(Hash) && parsed["error"]
-              raise "JSON-RPC error #{parsed["error"]["code"]}: #{parsed["error"]["message"]}"
+            if parsed.is_a?(Hash) && (err = parsed["error"])
+              raise A2A::JsonRpcError.new(err["message"], code: err["code"], data: err["data"])
             end
 
             # Extract result from JSON-RPC envelope
@@ -89,7 +89,7 @@ test do
     env.request = ::Faraday::RequestOptions.new
     env.request.context = { a2a_operation: operation }
 
-    lambda { middleware.new(nil).on_complete(env) }.should.raise(RuntimeError)
+    lambda { middleware.new(nil).on_complete(env) }.should.raise(A2A::JsonRpcError)
   end
 
   it "returns raw hash when response_schema is nil" do

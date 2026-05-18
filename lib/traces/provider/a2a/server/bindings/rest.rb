@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require_relative "../../../../a2a/bindings/rest"
+require_relative "../../../../../a2a/server/bindings/rest"
 require "traces/provider"
 
-Traces::Provider(A2A::Bindings::Rest) do
+Traces::Provider(A2A::Server::Bindings::Rest) do
   def call(env)
     Traces.trace("a2a.bindings.rest.call") do |span|
       super.tap do |status, headers, body|

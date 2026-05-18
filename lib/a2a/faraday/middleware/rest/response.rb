@@ -25,12 +25,14 @@ module A2A
 
             if env.status >= 400
               parsed = env.body
-              message = if parsed.is_a?(Hash)
-                parsed["title"] || parsed["message"] || parsed.to_s
+              if parsed.is_a?(Hash)
+                message = parsed["title"] || parsed["message"] || parsed.to_s
+                data    = parsed["detail"]
               else
-                parsed.to_s
+                message = parsed.to_s
+                data    = nil
               end
-              raise "HTTP #{env.status}: #{message}"
+              raise A2A::RestError.new(message, http_status: env.status, data: data)
             end
 
             parsed = env.body
@@ -100,7 +102,7 @@ test do
     env.request = ::Faraday::RequestOptions.new
     env.request.context = { a2a_operation: operation }
 
-    lambda { middleware.new(nil).on_complete(env) }.should.raise(RuntimeError)
+    lambda { middleware.new(nil).on_complete(env) }.should.raise(A2A::RestError)
   end
 
   it "raises on HTTP 5xx error" do
@@ -110,7 +112,7 @@ test do
     env.request = ::Faraday::RequestOptions.new
     env.request.context = { a2a_operation: operation }
 
-    lambda { middleware.new(nil).on_complete(env) }.should.raise(RuntimeError)
+    lambda { middleware.new(nil).on_complete(env) }.should.raise(A2A::RestError)
   end
 
   it "passes through when no operation is set" do

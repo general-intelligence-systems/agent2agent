@@ -257,6 +257,9 @@ module A2A
   end
 end
 
+require "a2a/errors/json_rpc_error"
+require "a2a/errors/rest_error"
+
 # Specification excerpt: refs/A2A/docs/specification.md, Section 3.3.2 Error Handling
 #
 # All operations may return errors in the following categories. Servers MUST return appropriate

@@ -5,8 +5,9 @@ require "a2a"
 require "a2a/sse"
 
 module A2A
-  module Bindings
-    # Rack middleware implementing the A2A HTTP+JSON/REST protocol binding.
+  class Server
+    module Bindings
+      # Rack middleware implementing the A2A HTTP+JSON/REST protocol binding.
     #
     # Extracts the HTTP verb, path, and request body/params into env keys.
     # Calls downstream. On return, wraps env["a2a.result"] into a REST
@@ -70,6 +71,7 @@ module A2A
           [status, { "content-type" => "application/problem+json" },
            [JSON.generate(body)]]
         end
+    end
     end
   end
 end

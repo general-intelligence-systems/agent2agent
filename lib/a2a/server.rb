@@ -62,8 +62,8 @@ module A2A
     private
 
       def build_app
-        require "a2a/bindings/json_rpc"
-        require "a2a/bindings/rest"
+        require "a2a/server/bindings/json_rpc"
+        require "a2a/server/bindings/rest"
 
         agent_card = @agent_card
         dispatcher = @dispatcher
@@ -80,13 +80,13 @@ module A2A
           end
 
           map "/a2a" do
-            use A2A::Bindings::JsonRpc
+            use A2A::Server::Bindings::JsonRpc
             use A2A::Server::Triage
             run dispatcher
           end
 
           map "/" do
-            use A2A::Bindings::Rest
+            use A2A::Server::Bindings::Rest
             use A2A::Server::Triage
             run dispatcher
           end

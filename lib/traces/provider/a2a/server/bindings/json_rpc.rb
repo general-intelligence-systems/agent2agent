@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
-require_relative "../../../../a2a/bindings/json_rpc"
+require_relative "../../../../../a2a/server/bindings/json_rpc"
 require "traces/provider"
 
-Traces::Provider(A2A::Bindings::JsonRpc) do
+Traces::Provider(A2A::Server::Bindings::JsonRpc) do
   def call(env)
     Traces.trace("a2a.bindings.json_rpc.call") do |span|
       super.tap do |status, headers, body|
