@@ -22,12 +22,13 @@ agent = A2A::Agent.new do
 
   on "SendMessage" do
     use A2A::Middleware::ExtractMessage
+    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id, from: :message
     respond_with -> (env) {
-      request = env["a2a.request"]
-      msg = request.message
-      text = env["a2a.message"]
+      request    = env["a2a.request"]
+      msg        = request.message
+      text       = env["a2a.message"]
+      existing   = env["a2a.task"]
 
-      task_id    = msg.task_id
       context_id = msg.context_id
       message_id = msg.message_id
       context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
@@ -40,25 +41,19 @@ agent = A2A::Agent.new do
         push_config = pnc if pnc
       end
 
-      if task_id && !task_id.empty?
-        existing = sqlite_store.get(task_id)
-        raise A2A::TaskNotFoundError.new(task_id) unless existing
+      if existing
         raise A2A::UnsupportedOperationError.new(message: "Task is in a terminal state") if terminal_states.include?(existing[:state])
-
-        sqlite_store.add_message(task_id, {
-          "messageId" => message_id || SecureRandom.uuid,
-          "role"      => "ROLE_USER",
-          "parts"     => [{ "text" => text }],
-        })
+        task_id = existing[:id]
       else
         task_id = SecureRandom.uuid
         sqlite_store.create(task_id, context_id, push_config)
-        sqlite_store.add_message(task_id, {
-          "messageId" => message_id || SecureRandom.uuid,
-          "role"      => "ROLE_USER",
-          "parts"     => [{ "text" => text }],
-        })
       end
+
+      sqlite_store.add_message(task_id, {
+        "messageId" => message_id || SecureRandom.uuid,
+        "role"      => "ROLE_USER",
+        "parts"     => [{ "text" => text }],
+      })
 
       artifact = {
         "artifactId" => SecureRandom.uuid,
@@ -150,7 +145,7 @@ agent = A2A::Agent.new do
   end
 
   on "GetTask" do
-    use A2A::Middleware::FetchTask, store: sqlite_store
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     use A2A::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       task  = env["a2a.task"]
@@ -213,7 +208,7 @@ agent = A2A::Agent.new do
   end
 
   on "CancelTask" do
-    use A2A::Middleware::FetchTask, store: sqlite_store
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     respond_with -> (env) {
       task = env["a2a.task"]
       raise A2A::TaskNotCancelableError.new(task[:id], state: task[:state]) if terminal_states.include?(task[:state])
@@ -273,7 +268,7 @@ agent = A2A::Agent.new do
   #end
 
   #on "CreateTaskPushNotificationConfig" do
-  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
   #  respond_with -> (env) {
   #    request = env["a2a.request"]
   #    task_id = env["a2a.task"][:id]
@@ -290,7 +285,7 @@ agent = A2A::Agent.new do
   #end
 
   #on "GetTaskPushNotificationConfig" do
-  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
   #  respond_with -> (env) {
   #    request   = env["a2a.request"]
   #    task_id   = env["a2a.task"][:id]
@@ -304,7 +299,7 @@ agent = A2A::Agent.new do
   #end
 
   #on "ListTaskPushNotificationConfigs" do
-  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
   #  respond_with -> (env) {
   #    task_id = env["a2a.task"][:id]
 
@@ -318,7 +313,7 @@ agent = A2A::Agent.new do
   #end
 
   #on "DeleteTaskPushNotificationConfig" do
-  #  use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+  #  use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
   #  respond_with -> (env) {
   #    request   = env["a2a.request"]
   #    task_id   = env["a2a.task"][:id]

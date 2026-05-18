@@ -20,7 +20,7 @@ module A2A
     # Usage:
     #
     #   on "GetTask" do
-    #     use A2A::Middleware::FetchTask, store: sqlite_store
+    #     use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     #     use A2A::Middleware::LimitHistoryLength, 20
     #     respond_with -> (env) {
     #       task  = env["a2a.task"]

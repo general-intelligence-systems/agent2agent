@@ -109,7 +109,7 @@ agent = A2A::Agent.new do
 
   # ── GetTask ──────────────────────────────────────────────────────────
   on "GetTask" do
-    use A2A::Middleware::FetchTask, store: sqlite_store
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     respond_with -> (env) {
       task = env["a2a.task"]
 
@@ -126,7 +126,7 @@ agent = A2A::Agent.new do
   # ── Push Notification Config CRUD ────────────────────────────────────
 
   on "CreateTaskPushNotificationConfig" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
       request = env["a2a.request"]
       task_id = env["a2a.task"][:id]
@@ -141,7 +141,7 @@ agent = A2A::Agent.new do
   end
 
   on "GetTaskPushNotificationConfig" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
       request   = env["a2a.request"]
       task_id   = env["a2a.task"][:id]
@@ -155,7 +155,7 @@ agent = A2A::Agent.new do
   end
 
   on "ListTaskPushNotificationConfigs" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
       task_id = env["a2a.task"][:id]
 
@@ -168,7 +168,7 @@ agent = A2A::Agent.new do
   end
 
   on "DeleteTaskPushNotificationConfig" do
-    use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
     respond_with -> (env) {
       request   = env["a2a.request"]
       task_id   = env["a2a.task"][:id]

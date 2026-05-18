@@ -178,7 +178,7 @@ agent = A2A::Agent.new do
   end
 
   on "GetTask" do
-    use A2A::Middleware::FetchTask, store: sqlite_store
+    use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
     respond_with -> (env) {
       task = env["a2a.task"]
 
