@@ -80,7 +80,10 @@ module A2A
         end
 
         def pattern_to_regex(pattern)
-          re = pattern.gsub(/\{[^}]+\}/, '([^/]+)')
+          # Path params must not swallow ":" — custom-method suffixes like
+          # "/tasks/{id=*}:subscribe" would otherwise be captured into the
+          # id by plainer patterns like "/tasks/{id=*}".
+          re = pattern.gsub(/\{[^}]+\}/, '([^/:]+)')
           /\A#{re}\z/
         end
 
@@ -95,3 +98,31 @@ module A2A
     end
   end
 end
+
+__END__
+  describe "A2A::Server::Triage" do
+    triage = -> (env) { A2A::Server::Triage.new(->(e) { e }).call(env) }
+
+    it "resolves GET /tasks/{id} to GetTask" do
+      env = triage.({ "a2a.verb" => "get", "a2a.path" => "/tasks/abc-123", "a2a.body" => {} })
+      env["a2a.operation"].should == "GetTask"
+      env["a2a.request"].id.should == "abc-123"
+    end
+
+    it "resolves GET /tasks/{id}:subscribe to SubscribeToTask, not GetTask" do
+      env = triage.({ "a2a.verb" => "get", "a2a.path" => "/tasks/abc-123:subscribe", "a2a.body" => {} })
+      env["a2a.operation"].should == "SubscribeToTask"
+      env["a2a.request"].id.should == "abc-123"
+    end
+
+    it "resolves POST /tasks/{id}:cancel to CancelTask" do
+      env = triage.({ "a2a.verb" => "post", "a2a.path" => "/tasks/abc-123:cancel", "a2a.body" => {} })
+      env["a2a.operation"].should == "CancelTask"
+      env["a2a.request"].id.should == "abc-123"
+    end
+
+    it "returns UnsupportedOperationError for an unknown path" do
+      result = triage.({ "a2a.verb" => "get", "a2a.path" => "/nope", "a2a.body" => {} })
+      result.should.be.is_a(A2A::UnsupportedOperationError)
+    end
+  end

@@ -122,3 +122,23 @@ end
 ```
 
 All 11 protocol operations are available as snake_case methods: `send_message`, `get_task`, `list_tasks`, `cancel_task`, `send_streaming_message`, `subscribe_to_task`, etc. Pass `binding: :rest` to `A2A::Client.new` to use the REST binding instead of JSON-RPC.
+
+## Mounting in a Host App
+
+An agent doesn't need its own process — `A2A.agent` returns a plain Rack app, so it mounts directly in Rails routes (or any Rack host):
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  echo_agent = A2A.agent(agent_card: { "name" => "Echo Agent" }) do |env|
+    case env["a2a.operation"]
+    in "SendMessage"
+      A2A::Protocol::JsonSchema["Send Message Response"].new({})
+    end
+  end
+
+  mount echo_agent, at: "/echo"
+end
+```
+
+See [Rails & Rack Hosts]({% link _core_features/rails-and-rack-hosts.md %}) for multiple agents, streaming, and testing over real HTTP.

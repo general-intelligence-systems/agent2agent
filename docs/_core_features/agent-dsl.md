@@ -109,6 +109,8 @@ in "CancelTask"
 | `A2A::VersionNotSupportedError.new(version)` | -32009 | 400 |
 | `A2A::InvalidParamsError.new(message, fields:)` | -32602 | 400 |
 
+See [Error Handling]({% link _core_features/error-handling.md %}) for a handler example raising every one of these, the wire formats, and rescuing every client-side error class.
+
 ## The Middleware Stack
 
 `A2A::Server` composes a single linear stack; each middleware handles the request or passes it downstream:

@@ -34,8 +34,10 @@ module A2A
             env.method = operation.rest_verb.to_sym
 
             if [:get, :delete].include?(env.method)
-              env.params ||= {}
-              remaining.each { |k, v| env.params[k.to_s] = v }
+              # The URL is already built by the time request middleware runs,
+              # so query params must be encoded into env.url directly —
+              # env.params is not consulted after this point.
+              env.url.query = URI.encode_www_form(remaining) unless remaining.empty?
               env.body = nil
             else
               # Serialize to JSON here rather than relying on Faraday's
@@ -122,7 +124,7 @@ describe "A2A::Client::Middleware::REST::Request" do
     env.url.path.should == "/rest/tasks/task-123"
     env.method.should == :get
     env.body.should.be.nil
-    env.params["historyLength"].should == "5"
+    env.url.query.should == "historyLength=5"
   end
 
   it "rewrites DELETE operation with multi-param path interpolation" do

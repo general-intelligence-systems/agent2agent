@@ -27,7 +27,7 @@ GET /.well-known/agent-card.json HTTP/1.1
 
 ```ruby
 result = client.send_message(
-  message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
+  message: { message_id: "msg-1", role: "ROLE_USER", parts: [{ text: "Hello" }] }
 )
 ```
 
@@ -48,7 +48,7 @@ Content-Type: application/a2a+json
 
 ```ruby
 client.send_streaming_message(
-  message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
+  message: { message_id: "msg-1", role: "ROLE_USER", parts: [{ text: "Hello" }] }
 ) do |event|
   # each SSE event parsed into a "Stream Response" schema object
 end

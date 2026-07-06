@@ -23,6 +23,8 @@ end
 
 Operations the block doesn't match automatically return `UnsupportedOperationError`.
 
+Because the return value is a plain Rack app, agents also mount directly inside a host application — e.g. `mount agent, at: "/agent1"` in Rails routes.
+
 ## Usage
 
 Please see the [project documentation](https://general-intelligence-systems.github.io/agent2agent/) for more details.
@@ -39,13 +41,17 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 
   - [Multi-Turn Conversations](https://general-intelligence-systems.github.io/agent2agent/multi-turn/) - This guide covers using `TASK_STATE_INPUT_REQUIRED` to build confirmation-gated and multi-step conversations.
 
+  - [Rails & Rack Hosts](https://general-intelligence-systems.github.io/agent2agent/rails-and-rack-hosts/) - This guide covers mounting agents in Rails routes (or any Rack host) and testing them over real HTTP.
+
   - [Async Background Jobs](https://general-intelligence-systems.github.io/agent2agent/async-jobs/) - This guide covers non-blocking background work with Async fibers and immediate SUBMITTED responses.
 
   - [Managing Task State](https://general-intelligence-systems.github.io/agent2agent/task-stores/) - This guide covers managing task state in your agent -- the gem ships no built-in task store, so persistence is your application's concern.
 
   - [Schema Validation](https://general-intelligence-systems.github.io/agent2agent/schema-validation/) - This guide covers the 47 A2A protocol types available as validated Ruby objects.
 
-  - [Protocol Operations](https://general-intelligence-systems.github.io/agent2agent/protocol-operations/) - This guide covers all 11 A2A operations and task state lifecycle.
+  - [Protocol Operations](https://general-intelligence-systems.github.io/agent2agent/protocol-operations/) - Server handler and client call for every one of the 11 A2A operations, plus the task state lifecycle.
+
+  - [Error Handling](https://general-intelligence-systems.github.io/agent2agent/error-handling/) - Raising every A2A protocol error from your handler, the wire formats, and rescuing every client-side error class.
 
   - [Example: Echo Agent](https://general-intelligence-systems.github.io/agent2agent/examples-basic/) - A minimal A2A agent that echoes messages back.
 

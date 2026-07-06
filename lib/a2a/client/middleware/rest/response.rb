@@ -32,6 +32,9 @@ module A2A
                 message = parsed.to_s
                 data    = nil
               end
+              # Streaming requests consume the body via on_data, leaving
+              # nothing here — fall back to the HTTP status.
+              message = "HTTP #{env.status}" if message.to_s.empty?
               raise A2A::RestError.new(message, http_status: env.status, data: data)
             end
 
