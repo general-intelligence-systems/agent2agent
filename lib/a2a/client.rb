@@ -134,7 +134,7 @@ describe "A2A::Client" do
   it "generates methods for all Proto operations" do
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env|
+        stub.post("/") { |env|
           [200, { "content-type" => "application/json" }, JSON.generate({ "jsonrpc" => "2.0", "id" => 1, "result" => {} })]
         }
       end
@@ -181,7 +181,7 @@ describe "A2A::Client" do
   it "json_rpc: send_message validates, wraps in JSON-RPC, returns Schema" do
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env|
+        stub.post("/") { |env|
           parsed = JSON.parse(env.body)
           parsed["method"].should == "SendMessage"
           parsed["params"]["message"]["role"].should == "ROLE_USER"
@@ -217,7 +217,7 @@ describe "A2A::Client" do
   it "json_rpc: get_task returns a Task" do
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env|
+        stub.post("/") { |env|
           parsed = JSON.parse(env.body)
           parsed["method"].should == "GetTask"
           parsed["params"]["id"].should == "task-123"
@@ -245,7 +245,7 @@ describe "A2A::Client" do
   it "json_rpc: raises on JSON-RPC error" do
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env|
+        stub.post("/") { |env|
           [200, { "content-type" => "application/json" }, JSON.generate({
             "jsonrpc" => "2.0",
             "id" => 1,
@@ -264,7 +264,7 @@ describe "A2A::Client" do
   it "json_rpc: raises ValidationError on invalid params" do
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env| [200, { "content-type" => "application/json" }, "{}"] }
+        stub.post("/") { |env| [200, { "content-type" => "application/json" }, "{}"] }
       end
     end
 
@@ -275,7 +275,7 @@ describe "A2A::Client" do
     captured_env = nil
     client = A2A::Client.new("http://localhost:9292") do |f|
       f.adapter :test do |stub|
-        stub.post("/a2a") { |env|
+        stub.post("/") { |env|
           captured_env = env
           [200, { "content-type" => "text/event-stream" }, ""]
         }
@@ -302,7 +302,7 @@ describe "A2A::Client" do
     captured_env = nil
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.post("/message:send") { |env|
+        stub.post("/rest/message:send") { |env|
           captured_env = env
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "task" => {
@@ -331,7 +331,7 @@ describe "A2A::Client" do
   it "rest: get_task uses GET /tasks/{id}" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/tasks/task-123") { |env|
+        stub.get("/rest/tasks/task-123") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "id" => "task-123",
             "contextId" => "ctx-456",
@@ -351,7 +351,7 @@ describe "A2A::Client" do
   it "rest: list_tasks uses GET /tasks" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/tasks") { |env|
+        stub.get("/rest/tasks") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "tasks" => [
               { "id" => "t-1", "contextId" => "c-1", "status" => { "state" => "TASK_STATE_COMPLETED" } }
@@ -368,7 +368,7 @@ describe "A2A::Client" do
   it "rest: cancel_task uses POST /tasks/{id}:cancel" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.post("/tasks/task-123:cancel") { |env|
+        stub.post("/rest/tasks/task-123:cancel") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "id" => "task-123", "contextId" => "ctx-456",
             "status" => { "state" => "TASK_STATE_CANCELED" }
@@ -385,7 +385,7 @@ describe "A2A::Client" do
   it "rest: create_task_push_notification_config uses POST /tasks/{task_id}/pushNotificationConfigs" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.post("/tasks/task-123/pushNotificationConfigs") { |env|
+        stub.post("/rest/tasks/task-123/pushNotificationConfigs") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "id" => "config-1", "taskId" => "task-123",
             "url" => "https://example.com/webhook"
@@ -403,7 +403,7 @@ describe "A2A::Client" do
   it "rest: get_task_push_notification_config uses GET /tasks/{task_id}/pushNotificationConfigs/{id}" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/tasks/task-123/pushNotificationConfigs/config-1") { |env|
+        stub.get("/rest/tasks/task-123/pushNotificationConfigs/config-1") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "id" => "config-1", "taskId" => "task-123",
             "url" => "https://example.com/webhook"
@@ -419,7 +419,7 @@ describe "A2A::Client" do
   it "rest: list_task_push_notification_configs uses GET /tasks/{task_id}/pushNotificationConfigs" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/tasks/task-123/pushNotificationConfigs") { |env|
+        stub.get("/rest/tasks/task-123/pushNotificationConfigs") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "pushNotificationConfigs" => []
           })]
@@ -434,7 +434,7 @@ describe "A2A::Client" do
   it "rest: delete_task_push_notification_config uses DELETE /tasks/{task_id}/pushNotificationConfigs/{id}" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.delete("/tasks/task-123/pushNotificationConfigs/config-1") { |env|
+        stub.delete("/rest/tasks/task-123/pushNotificationConfigs/config-1") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({})]
         }
       end
@@ -447,7 +447,7 @@ describe "A2A::Client" do
   it "rest: get_extended_agent_card uses GET /extendedAgentCard" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/extendedAgentCard") { |env|
+        stub.get("/rest/extendedAgentCard") { |env|
           [200, { "content-type" => "application/a2a+json" }, JSON.generate({
             "name" => "Extended Agent",
             "version" => "2.0.0",
@@ -469,7 +469,7 @@ describe "A2A::Client" do
     captured_env = nil
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/tasks/task-1:subscribe") { |env|
+        stub.get("/rest/tasks/task-1:subscribe") { |env|
           captured_env = env
           [200, { "content-type" => "text/event-stream" }, ""]
         }
@@ -485,7 +485,7 @@ describe "A2A::Client" do
   it "rest: raises on HTTP 400 error" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.get("/tasks/bad-id") { |env|
+        stub.get("/rest/tasks/bad-id") { |env|
           [400, { "content-type" => "application/problem+json" }, JSON.generate({
             "type" => "error",
             "title" => "Bad Request","status" => 400
@@ -500,7 +500,7 @@ describe "A2A::Client" do
   it "rest: raises ValidationError on invalid params" do
     client = A2A::Client.new("http://localhost:9292", binding: :rest) do |f|
       f.adapter :test do |stub|
-        stub.post("/message:send") { |env| [200, { "content-type" => "application/a2a+json" }, "{}"] }
+        stub.post("/rest/message:send") { |env| [200, { "content-type" => "application/a2a+json" }, "{}"] }
       end
     end
 

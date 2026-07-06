@@ -9,6 +9,10 @@ module A2A
     module Bindings
       # Rack middleware implementing the A2A JSON-RPC 2.0 protocol binding.
     #
+    # Claims requests under its path prefix (default "/", i.e. everything)
+    # that were not already claimed by a binding earlier in the stack
+    # (env["a2a.body"] unset); all other requests pass through untouched.
+    #
     # Strips the JSON-RPC envelope from the inbound request, setting
     # env keys for the method name, request id, and parsed params.
     # Calls downstream. On return, wraps env["a2a.result"] back into
@@ -21,12 +25,17 @@ module A2A
     # with backpressure — no Thread::Queue, no #each polling.
     #
     class JsonRpc
-      def initialize(app)
+      def initialize(app, path_prefix: "/")
         @app = app
+        @path_prefix = path_prefix
       end
 
       def call(env)
-        req  = Rack::Request.new(env)
+        return @app.call(env) if env.key?("a2a.body")
+
+        req = Rack::Request.new(env)
+        return @app.call(env) unless claims?(req.path_info)
+
         body = req.body.read
         req.body.rewind
 
@@ -66,6 +75,17 @@ module A2A
 
       private
 
+        def claims?(path)
+          # A request to the exact mount point of a mounted app (e.g. Rails
+          # `mount server, at: "/agent1"`) arrives with an empty PATH_INFO.
+          path = "/" if path.to_s.empty?
+
+          return true if path == @path_prefix
+
+          prefix = @path_prefix.end_with?("/") ? @path_prefix : "#{@path_prefix}/"
+          path.start_with?(prefix)
+        end
+
         def success_response(id, result)
           body = result.respond_to?(:to_h) ? result.to_h : (result || {})
           [200, { "content-type" => "application/json" },
@@ -100,7 +120,7 @@ describe "A2A::Server::Bindings::JsonRpc" do
         params: {}
       })
 
-      response = rack.post("/a2a", input: body, "CONTENT_TYPE" => "application/json")
+      response = rack.post("/", input: body, "CONTENT_TYPE" => "application/json")
       parsed   = JSON.parse(response.body)
 
       parsed["error"].should.be.nil

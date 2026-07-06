@@ -19,7 +19,7 @@ module A2A
             operation = env.request.context&.dig(:a2a_operation)
             return unless operation
 
-            env.url.path = "/a2a"
+            env.url.path = "/"
             env.method = :post
 
             env.body = {
@@ -48,7 +48,7 @@ describe "A2A::Faraday::Middleware::JsonRpc::Request" do
   middleware = A2A::Faraday::Middleware::JsonRpc::Request
   operation = A2A::Proto.operation("SendMessage")
 
-  it "wraps body in JSON-RPC 2.0 envelope and sets path to /a2a" do
+  it "wraps body in JSON-RPC 2.0 envelope and sets path to /" do
     env = ::Faraday::Env.new
     env.url = URI.parse("http://localhost:9292/")
     env.body = { "message" => { "role" => "ROLE_USER" } }
@@ -57,7 +57,7 @@ describe "A2A::Faraday::Middleware::JsonRpc::Request" do
 
     middleware.new(nil).on_request(env)
 
-    env.url.path.should == "/a2a"
+    env.url.path.should == "/"
     env.method.should == :post
     env.body[:jsonrpc].should == "2.0"
     env.body[:id].should == 1

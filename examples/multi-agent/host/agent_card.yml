@@ -2,7 +2,7 @@ name: Host Orchestrator
 description: An LLM-powered orchestrator that discovers remote agents and delegates tasks to the most appropriate one.
 version: "1.0.0"
 supportedInterfaces:
-  - url: http://localhost:9294/a2a
+  - url: http://localhost:9294
     protocolBinding: JSONRPC
     protocolVersion: "1.0"
 capabilities:

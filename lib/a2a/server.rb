@@ -4,22 +4,23 @@ require "bundler/setup"
 require "a2a"
 
 require "a2a/server/env"
+require "a2a/server/well_known"
 require "a2a/server/triage"
 require "a2a/server/dispatcher"
 
 module A2A
   # Rack application that exposes an A2A-compliant agent server.
   #
-  # Composes two separate middleware stacks, one for each protocol binding:
+  # Composes a single linear middleware stack. Each middleware checks the
+  # request path and either handles the request or passes it downstream:
   #
-  #   /.well-known/agent-card.json
-  #     → Env → serve agent card
-  #
-  #   /a2a  (JSON-RPC 2.0)
-  #     → Env → Bindings::JsonRpc → Triage → Dispatcher
-  #
-  #   /     (HTTP+JSON/REST)
-  #     → Env → Bindings::Rest → Triage → Dispatcher
+  #   Env               → injects shared context into the env
+  #   WellKnown         → serves /.well-known/agent-card.json
+  #   Bindings::Grpc    → /grpc (reserved) → 501 Not Implemented
+  #   Bindings::Rest    → /rest (HTTP+JSON/REST)
+  #   Bindings::JsonRpc → everything else (JSON-RPC 2.0)
+  #   Triage            → resolves the target operation
+  #   Dispatcher        → invokes the registered handler
   #
   # Usage:
   #
@@ -64,6 +65,7 @@ module A2A
     private
 
       def build_app
+        require "a2a/server/bindings/grpc"
         require "a2a/server/bindings/json_rpc"
         require "a2a/server/bindings/rest"
 
@@ -72,26 +74,12 @@ module A2A
 
         Rack::Builder.app do
           use A2A::Server::Env, agent_card: agent_card
-
-          map "/.well-known/agent-card.json" do
-            run ->(env) {
-              card = env["a2a.agent_card"] || {}
-              body = card.is_a?(Hash) ? card : card.to_h
-              [200, { "content-type" => "application/json" }, [JSON.generate(body)]]
-            }
-          end
-
-          map "/a2a" do
-            use A2A::Server::Bindings::JsonRpc
-            use A2A::Server::Triage
-            run dispatcher
-          end
-
-          map "/" do
-            use A2A::Server::Bindings::Rest
-            use A2A::Server::Triage
-            run dispatcher
-          end
+          use A2A::Server::WellKnown
+          use A2A::Server::Bindings::Grpc,    path_prefix: "/grpc"
+          use A2A::Server::Bindings::Rest,    path_prefix: "/rest"
+          use A2A::Server::Bindings::JsonRpc, path_prefix: "/"
+          use A2A::Server::Triage
+          run dispatcher
         end
       end
   end

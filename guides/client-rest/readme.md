@@ -25,7 +25,7 @@ result = client.send_message(
 ```
 
 ```
-POST /message:send HTTP/1.1
+POST /rest/message:send HTTP/1.1
 Content-Type: application/a2a+json
 
 {
@@ -47,7 +47,7 @@ end
 ```
 
 ```
-POST /message:stream HTTP/1.1
+POST /rest/message:stream HTTP/1.1
 Content-Type: application/a2a+json
 Accept: text/event-stream
 
@@ -67,7 +67,7 @@ task = client.get_task(id: "task-123")
 ```
 
 ```
-GET /tasks/task-123 HTTP/1.1
+GET /rest/tasks/task-123 HTTP/1.1
 ```
 
 ## list_tasks
@@ -78,7 +78,7 @@ result = client.list_tasks(context_id: "ctx-1")
 ```
 
 ```
-GET /tasks HTTP/1.1
+GET /rest/tasks HTTP/1.1
 ```
 
 ## cancel_task
@@ -88,7 +88,7 @@ task = client.cancel_task(id: "task-123")
 ```
 
 ```
-POST /tasks/task-123:cancel HTTP/1.1
+POST /rest/tasks/task-123:cancel HTTP/1.1
 Content-Type: application/a2a+json
 ```
 
@@ -100,7 +100,7 @@ end
 ```
 
 ```
-GET /tasks/task-123:subscribe HTTP/1.1
+GET /rest/tasks/task-123:subscribe HTTP/1.1
 Accept: text/event-stream
 ```
 
@@ -113,7 +113,7 @@ config = client.create_task_push_notification_config(
 ```
 
 ```
-POST /tasks/task-123/pushNotificationConfigs HTTP/1.1
+POST /rest/tasks/task-123/pushNotificationConfigs HTTP/1.1
 Content-Type: application/a2a+json
 
 {
@@ -128,7 +128,7 @@ config = client.get_task_push_notification_config(id: "config-1", task_id: "task
 ```
 
 ```
-GET /tasks/task-123/pushNotificationConfigs/config-1 HTTP/1.1
+GET /rest/tasks/task-123/pushNotificationConfigs/config-1 HTTP/1.1
 ```
 
 ## list_task_push_notification_configs
@@ -138,7 +138,7 @@ result = client.list_task_push_notification_configs(task_id: "task-123")
 ```
 
 ```
-GET /tasks/task-123/pushNotificationConfigs HTTP/1.1
+GET /rest/tasks/task-123/pushNotificationConfigs HTTP/1.1
 ```
 
 ## delete_task_push_notification_config
@@ -148,7 +148,7 @@ client.delete_task_push_notification_config(id: "config-1", task_id: "task-123")
 ```
 
 ```
-DELETE /tasks/task-123/pushNotificationConfigs/config-1 HTTP/1.1
+DELETE /rest/tasks/task-123/pushNotificationConfigs/config-1 HTTP/1.1
 ```
 
 ## get_extended_agent_card
@@ -158,5 +158,5 @@ card = client.get_extended_agent_card
 ```
 
 ```
-GET /extendedAgentCard HTTP/1.1
+GET /rest/extendedAgentCard HTTP/1.1
 ```

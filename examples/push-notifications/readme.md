@@ -62,7 +62,7 @@ Both services should be running. The receiver is waiting for webhook POSTs on po
 ## Step 3: Submit a job with an inline push notification config
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
     "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Process this data"}]},
@@ -165,7 +165,7 @@ Each webhook includes the `token` you provided (`my-secret-token`) in the `X-A2A
 Replace `TASK_ID_HERE` with the `id` from Step 3:
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"GetTask","params":{"id":"TASK_ID_HERE"}}' | jq .
 ```
@@ -211,7 +211,7 @@ The agent supports the full push notification config lifecycle. These operations
 ### Create a push notification config
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":3,"method":"CreateTaskPushNotificationConfig","params":{
     "taskId":"TASK_ID_HERE",
@@ -241,7 +241,7 @@ Expected output:
 Replace `CONFIG_ID_HERE`:
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":4,"method":"GetTaskPushNotificationConfig","params":{
     "taskId":"TASK_ID_HERE",
@@ -266,7 +266,7 @@ Expected output:
 ### List all push notification configs for a task
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":5,"method":"ListTaskPushNotificationConfigs","params":{
     "taskId":"TASK_ID_HERE"
@@ -300,7 +300,7 @@ Expected output:
 ### Delete a push notification config
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":6,"method":"DeleteTaskPushNotificationConfig","params":{
     "taskId":"TASK_ID_HERE",

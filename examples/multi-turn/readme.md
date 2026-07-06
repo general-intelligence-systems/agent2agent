@@ -45,7 +45,7 @@ agent-1  |                | Multi-turn example: INPUT_REQUIRED → confirmation 
 ## Step 3: Turn 1 -- Send a research topic
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
     "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Research quantum computing"}]}
@@ -107,7 +107,7 @@ The key things to notice:
 Replace `TASK_ID_HERE` with the `id` from the Turn 1 response:
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
     "message":{"messageId":"m2","role":"ROLE_USER","taskId":"TASK_ID_HERE","parts":[{"text":"go ahead"}]}

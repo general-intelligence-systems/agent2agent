@@ -6,7 +6,7 @@
 #
 # Request:
 #
-# POST /message:stream HTTP/1.1
+# POST /rest/message:stream HTTP/1.1
 # Host: agent.example.com
 # Content-Type: application/a2a+json
 # Authorization: Bearer token

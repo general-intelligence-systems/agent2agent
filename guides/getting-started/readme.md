@@ -58,8 +58,9 @@ The server exposes three endpoint groups automatically:
 | Path | Purpose |
 |------|---------|
 | `/.well-known/agent-card.json` | Agent card discovery |
-| `/a2a` | JSON-RPC 2.0 binding |
-| `/*` | HTTP+JSON/REST binding |
+| `/` | JSON-RPC 2.0 binding |
+| `/rest/*` | HTTP+JSON/REST binding |
+| `/grpc` | gRPC binding (reserved, not yet implemented) |
 
 ## Calling It
 
@@ -68,12 +69,12 @@ The server exposes three endpoint groups automatically:
 curl http://localhost:9292/.well-known/agent-card.json
 
 # JSON-RPC
-curl -X POST http://localhost:9292/a2a \
+curl -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Hello"}]}}}'
 
 # REST
-curl -X POST http://localhost:9292/message:send \
+curl -X POST http://localhost:9292/rest/message:send \
   -H "Content-Type: application/json" \
   -d '{"message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Hello"}]}}'
 ```

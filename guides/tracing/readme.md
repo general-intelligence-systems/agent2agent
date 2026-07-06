@@ -132,7 +132,7 @@ Output:
 ```
 0.0s     info: traces [oid=0x...] [ec=0x...] [pid=...]
              | a2a.server.call
-             | {"http.method"=>"POST", "http.path"=>"/a2a", "http.status_code"=>200}
+             | {"http.method"=>"POST", "http.path"=>"/", "http.status_code"=>200}
 ```
 
 ## Testing with Traces

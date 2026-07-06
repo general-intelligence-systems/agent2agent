@@ -2,7 +2,7 @@ name: Greeter Agent
 description: Generates creative, personalized greetings for any occasion.
 version: "1.0.0"
 supportedInterfaces:
-  - url: http://greeter:9292/a2a
+  - url: http://greeter:9292
     protocolBinding: JSONRPC
     protocolVersion: "1.0"
 capabilities:

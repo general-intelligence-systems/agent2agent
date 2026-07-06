@@ -47,7 +47,7 @@ agent-1  |                | Streaming artifacts example: chunked files with appe
 ## Step 3: Stream generated code files (SSE)
 
 ```bash
-curl -N -X POST http://localhost:9292/a2a \
+curl -N -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendStreamingMessage","params":{
     "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Generate a web app"}]}
@@ -93,7 +93,7 @@ Press `Ctrl+C` after the stream ends.
 ## Step 4: Non-streaming fallback (SendMessage)
 
 ```bash
-curl -s -X POST http://localhost:9292/a2a \
+curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
     "message":{"messageId":"m2","role":"ROLE_USER","parts":[{"text":"Generate a web app"}]}

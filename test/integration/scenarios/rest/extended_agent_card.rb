@@ -29,7 +29,7 @@
 #
 # Step 3: Client fetches authenticated extended Agent Card
 #
-# GET /extendedAgentCard HTTP/1.1
+# GET /rest/extendedAgentCard HTTP/1.1
 # Host: agent.example.com
 # Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 #

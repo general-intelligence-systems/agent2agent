@@ -6,7 +6,7 @@
 #
 # Initial Request:
 #
-# POST /message:send HTTP/1.1
+# POST /rest/message:send HTTP/1.1
 # Host: agent.example.com
 # Content-Type: application/a2a+json
 # Authorization: Bearer token
@@ -39,7 +39,7 @@
 #
 # Follow-up Request:
 #
-# POST /message:send HTTP/1.1
+# POST /rest/message:send HTTP/1.1
 # Host: agent.example.com
 # Content-Type: application/a2a+json
 # Authorization: Bearer token

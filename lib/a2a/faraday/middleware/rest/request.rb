@@ -13,8 +13,9 @@ module A2A
         #
         # Reads env.request.context[:a2a_operation] to determine the
         # HTTP verb and path. Interpolates path parameters from the
-        # request body (e.g. {id=*} placeholders). For GET/DELETE
-        # operations, remaining params become query string parameters.
+        # request body (e.g. {id=*} placeholders) and prefixes the
+        # /rest mount point. For GET/DELETE operations, remaining
+        # params become query string parameters.
         #
         # Sets Content-Type to application/a2a+json for POST requests.
         #
@@ -27,7 +28,7 @@ module A2A
             path = interpolate_path(operation.rest_path, params)
             remaining = remove_path_params(operation.rest_path, params)
 
-            env.url.path = path
+            env.url.path = "/rest#{path}"
             env.method = operation.rest_verb.to_sym
 
             if [:get, :delete].include?(env.method)
@@ -98,7 +99,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
 
     middleware.new(nil).on_request(env)
 
-    env.url.path.should == "/message:send"
+    env.url.path.should == "/rest/message:send"
     env.method.should == :post
     JSON.parse(env.body).should == { "message" => { "role" => "ROLE_USER" } }
     env.request_headers["content-type"].should == "application/a2a+json"
@@ -116,7 +117,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
 
     middleware.new(nil).on_request(env)
 
-    env.url.path.should == "/tasks/task-123"
+    env.url.path.should == "/rest/tasks/task-123"
     env.method.should == :get
     env.body.should.be.nil
     env.params["historyLength"].should == "5"
@@ -134,7 +135,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
 
     middleware.new(nil).on_request(env)
 
-    env.url.path.should == "/tasks/task-123/pushNotificationConfigs/config-1"
+    env.url.path.should == "/rest/tasks/task-123/pushNotificationConfigs/config-1"
     env.method.should == :delete
     env.body.should.be.nil
   end
@@ -151,7 +152,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
 
     middleware.new(nil).on_request(env)
 
-    env.url.path.should == "/tasks/task-123:cancel"
+    env.url.path.should == "/rest/tasks/task-123:cancel"
     env.method.should == :post
     JSON.parse(env.body).should == { "metadata" => { "key" => "val" } }
   end

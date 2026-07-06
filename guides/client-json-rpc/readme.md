@@ -25,7 +25,7 @@ result = client.send_message(
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -52,7 +52,7 @@ end
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 Accept: text/event-stream
 
@@ -77,7 +77,7 @@ task = client.get_task(id: "task-123")
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -96,7 +96,7 @@ result = client.list_tasks(context_id: "ctx-1")
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -114,7 +114,7 @@ task = client.cancel_task(id: "task-123")
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -133,7 +133,7 @@ end
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 Accept: text/event-stream
 
@@ -154,7 +154,7 @@ config = client.create_task_push_notification_config(
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -175,7 +175,7 @@ config = client.get_task_push_notification_config(id: "config-1", task_id: "task
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -193,7 +193,7 @@ result = client.list_task_push_notification_configs(task_id: "task-123")
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -211,7 +211,7 @@ client.delete_task_push_notification_config(id: "config-1", task_id: "task-123")
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {
@@ -229,7 +229,7 @@ card = client.get_extended_agent_card
 ```
 
 ```
-POST /a2a HTTP/1.1
+POST / HTTP/1.1
 Content-Type: application/json
 
 {

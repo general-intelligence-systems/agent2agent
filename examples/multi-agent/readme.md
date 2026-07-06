@@ -77,7 +77,7 @@ All three services should be running. The host knows where to find the remote ag
 ## Step 3: Send a greeting request (routed to greeter)
 
 ```bash
-curl -s -X POST http://localhost:9294/a2a \
+curl -s -X POST http://localhost:9294/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"SendMessage","params":{
     "message":{"messageId":"m1","role":"ROLE_USER","parts":[{"text":"Greet Alice for her birthday"}]}
@@ -155,7 +155,7 @@ host-1  |                | Routing to 'greeter' for: Greet Alice for her birthda
 ## Step 4: Send a translation request (routed to translator)
 
 ```bash
-curl -s -X POST http://localhost:9294/a2a \
+curl -s -X POST http://localhost:9294/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"SendMessage","params":{
     "message":{"messageId":"m2","role":"ROLE_USER","parts":[{"text":"Translate hello to Japanese"}]}

@@ -8,17 +8,17 @@ All 11 A2A operations are derived from the proto definition:
 
 | Operation | REST | Streaming |
 |-----------|------|-----------|
-| SendMessage | `POST /message:send` | No |
-| SendStreamingMessage | `POST /message:stream` | Yes |
-| GetTask | `GET /tasks/{id}` | No |
-| ListTasks | `GET /tasks` | No |
-| CancelTask | `POST /tasks/{id}:cancel` | No |
-| SubscribeToTask | `GET /tasks/{id}:subscribe` | Yes |
-| CreateTaskPushNotificationConfig | `POST /tasks/{task_id}/pushNotificationConfigs` | No |
-| GetTaskPushNotificationConfig | `GET /tasks/{task_id}/pushNotificationConfigs/{id}` | No |
-| ListTaskPushNotificationConfigs | `GET /tasks/{task_id}/pushNotificationConfigs` | No |
-| DeleteTaskPushNotificationConfig | `DELETE /tasks/{task_id}/pushNotificationConfigs/{id}` | No |
-| GetExtendedAgentCard | `GET /extendedAgentCard` | No |
+| SendMessage | `POST /rest/message:send` | No |
+| SendStreamingMessage | `POST /rest/message:stream` | Yes |
+| GetTask | `GET /rest/tasks/{id}` | No |
+| ListTasks | `GET /rest/tasks` | No |
+| CancelTask | `POST /rest/tasks/{id}:cancel` | No |
+| SubscribeToTask | `GET /rest/tasks/{id}:subscribe` | Yes |
+| CreateTaskPushNotificationConfig | `POST /rest/tasks/{task_id}/pushNotificationConfigs` | No |
+| GetTaskPushNotificationConfig | `GET /rest/tasks/{task_id}/pushNotificationConfigs/{id}` | No |
+| ListTaskPushNotificationConfigs | `GET /rest/tasks/{task_id}/pushNotificationConfigs` | No |
+| DeleteTaskPushNotificationConfig | `DELETE /rest/tasks/{task_id}/pushNotificationConfigs/{id}` | No |
+| GetExtendedAgentCard | `GET /rest/extendedAgentCard` | No |
 
 ## Inspecting Operations
 

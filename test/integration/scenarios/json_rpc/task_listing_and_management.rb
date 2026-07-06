@@ -6,7 +6,7 @@
 #
 # Request: All tasks from a specific context
 #
-# GET /tasks?contextId=c295ea44-7543-4f78-b524-7a38915ad6e4&pageSize=10&historyLength=3 HTTP/1.1
+# GET /rest/tasks?contextId=c295ea44-7543-4f78-b524-7a38915ad6e4&pageSize=10&historyLength=3 HTTP/1.1
 # Host: agent.example.com
 # Authorization: Bearer token
 #
@@ -33,7 +33,7 @@
 #
 # Request: All working tasks across all contexts
 #
-# GET /tasks?status=TASK_STATE_WORKING&pageSize=20 HTTP/1.1
+# GET /rest/tasks?status=TASK_STATE_WORKING&pageSize=20 HTTP/1.1
 # Host: agent.example.com
 # Authorization: Bearer token
 #
@@ -69,7 +69,7 @@
 #
 # Pagination Example
 #
-# GET /tasks?contextId=c295ea44-7543-4f78-b524-7a38915ad6e4&pageSize=10&pageToken=base64-encoded-cursor-token HTTP/1.1
+# GET /rest/tasks?contextId=c295ea44-7543-4f78-b524-7a38915ad6e4&pageSize=10&pageToken=base64-encoded-cursor-token HTTP/1.1
 # Host: agent.example.com
 # Authorization: Bearer token
 #
@@ -89,7 +89,7 @@
 #
 # Validation Error Example
 #
-# GET /tasks?pageSize=150&historyLength=-5&status=TASK_STATE_RUNNING HTTP/1.1
+# GET /rest/tasks?pageSize=150&historyLength=-5&status=TASK_STATE_RUNNING HTTP/1.1
 # Host: agent.example.com
 # Authorization: Bearer token
 #

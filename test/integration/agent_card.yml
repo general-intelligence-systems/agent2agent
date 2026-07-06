@@ -2,10 +2,10 @@ name: Integration Test Agent
 description: A2A agent for integration testing.
 version: "1.0.0"
 supportedInterfaces:
-  - url: http://localhost:9292/a2a
+  - url: http://localhost:9292
     protocolBinding: JSONRPC
     protocolVersion: "1.0"
-  - url: http://localhost:9292
+  - url: http://localhost:9292/rest
     protocolBinding: HTTP+JSON
     protocolVersion: "1.0"
 capabilities:

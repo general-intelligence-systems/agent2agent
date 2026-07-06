@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
-require "scampi"
 require "json"
 require "json_schemer"
 require "async"

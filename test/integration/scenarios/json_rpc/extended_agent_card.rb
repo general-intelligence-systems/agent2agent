@@ -21,7 +21,7 @@
 #      - Response includes securitySchemes with authentication details
 #   3. Obtain credentials (out-of-band OAuth 2.0 / OIDC flow)
 #   4. Fetch the authenticated extended Agent Card
-#      - May use GET /extendedAgentCard (HTTP) or a JSON-RPC method
+#      - May use GET /rest/extendedAgentCard (HTTP) or a JSON-RPC method
 #      - Include Authorization header with bearer token from step 3
 #   5. Receive the extended Agent Card with additional skills and details
 #
@@ -62,7 +62,7 @@
 #   }
 #
 # Example Step 4 - Extended Agent Card:
-#   GET /extendedAgentCard HTTP/1.1
+#   GET /rest/extendedAgentCard HTTP/1.1
 #   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 #
 #   Response:

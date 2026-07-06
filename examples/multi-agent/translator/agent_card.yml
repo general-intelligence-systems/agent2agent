@@ -2,7 +2,7 @@ name: Translator Agent
 description: Translates text into different languages.
 version: "1.0.0"
 supportedInterfaces:
-  - url: http://translator:9293/a2a
+  - url: http://translator:9293
     protocolBinding: JSONRPC
     protocolVersion: "1.0"
 capabilities:

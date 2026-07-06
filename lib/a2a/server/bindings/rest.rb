@@ -9,9 +9,11 @@ module A2A
     module Bindings
       # Rack middleware implementing the A2A HTTP+JSON/REST protocol binding.
     #
-    # Extracts the HTTP verb, path, and request body/params into env keys.
-    # Calls downstream. On return, wraps env["a2a.result"] into a REST
-    # response with content-type application/a2a+json.
+    # Claims requests under its path prefix (default "/rest"); all other
+    # requests pass through untouched. For claimed requests, extracts the
+    # HTTP verb, path (with the prefix stripped), and request body/params
+    # into env keys. Calls downstream. On return, wraps env["a2a.result"]
+    # into a REST response with content-type application/a2a+json.
     #
     # Streaming operations:
     # When the handler sets env["a2a.stream"] to an SSE::Stream (which is
@@ -19,15 +21,19 @@ module A2A
     # no wrapping, no #each conversion, true async with backpressure.
     #
     class Rest
-      def initialize(app)
+      def initialize(app, path_prefix: "/rest")
         @app = app
+        @path_prefix = path_prefix
       end
 
       def call(env)
-        req = Rack::Request.new(env)
+        req  = Rack::Request.new(env)
+        path = req.path_info
+
+        return @app.call(env) unless claims?(path)
 
         env["a2a.verb"] = req.request_method.downcase
-        env["a2a.path"] = req.path_info
+        env["a2a.path"] = path.delete_prefix(@path_prefix)
 
         params = {}
         if req.post? || req.put? || req.patch?
@@ -59,6 +65,13 @@ module A2A
 
       private
 
+        def claims?(path)
+          return true if path == @path_prefix
+
+          prefix = @path_prefix.end_with?("/") ? @path_prefix : "#{@path_prefix}/"
+          path.start_with?(prefix)
+        end
+
         def success_response(result)
           body = result.respond_to?(:to_h) ? result.to_h : (result || {})
           [200, { "content-type" => "application/a2a+json" },
@@ -87,7 +100,7 @@ describe "A2A::Server::Bindings::REST" do
   A2A::Proto.operations.each do |op|
     it "#{op.rest_verb.upcase} #{op.rest_path} returns valid #{op.response_type}" do
       # Build request path, replacing {id=*} etc with a placeholder value
-      path = op.rest_path.gsub(/\{[^}]+\}/, "test-id")
+      path = "/rest" + op.rest_path.gsub(/\{[^}]+\}/, "test-id")
 
       input = nil
       if op.http_bindings.first.body
