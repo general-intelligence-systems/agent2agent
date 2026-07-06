@@ -24,13 +24,13 @@ on "SendMessage" do |request|
   if return_immediately
     processor.call(&work)  # fire and forget
     task = store.get(task_id)
-    respond A2A::Schema["Send Message Response"].new(
+    respond A2A::Protocol::JsonSchema["Send Message Response"].new(
       task: { "id" => task_id, "status" => { "state" => "TASK_STATE_SUBMITTED" } }
     )
   else
     work.call  # blocking
     task = store.get(task_id)
-    respond A2A::Schema["Send Message Response"].new(task: { ... })
+    respond A2A::Protocol::JsonSchema["Send Message Response"].new(task: { ... })
   end
 end
 ```

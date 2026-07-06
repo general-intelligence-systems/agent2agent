@@ -2,8 +2,8 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/sse"
-require "a2a/middleware"
+require "a2a/server/sse"
+require "a2a/server/middleware"
 require "async/semaphore"
 require "console"
 require "securerandom"
@@ -35,7 +35,7 @@ agent = A2A::Agent.new do
   # for each state transition and artifact.
   #
   on "SendMessage" do
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
@@ -112,7 +112,7 @@ agent = A2A::Agent.new do
 
       # Return immediately with SUBMITTED state
       task = LOCK.acquire { TASKS[task_id] }
-      A2A::Schema["Send Message Response"].new(
+      A2A::Protocol::JsonSchema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
           "contextId" => task[:context_id],
@@ -131,7 +131,7 @@ agent = A2A::Agent.new do
       task = LOCK.acquire { TASKS[id] }
       raise A2A::TaskNotFoundError.new(id) unless task
 
-      A2A::Schema["Task"].new(
+      A2A::Protocol::JsonSchema["Task"].new(
         id:         task[:id],
         context_id: task[:context_id],
         status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
@@ -158,7 +158,7 @@ agent = A2A::Agent.new do
 
       LOCK.acquire { TASKS[task_id][:push_configs] << config_data }
 
-      A2A::Schema["Task Push Notification Config"].new(config_data)
+      A2A::Protocol::JsonSchema["Task Push Notification Config"].new(config_data)
     }
   end
 
@@ -174,7 +174,7 @@ agent = A2A::Agent.new do
       config = task[:push_configs]&.find { |c| c["id"] == config_id }
       raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
-      A2A::Schema["Task Push Notification Config"].new(config)
+      A2A::Protocol::JsonSchema["Task Push Notification Config"].new(config)
     }
   end
 
@@ -186,7 +186,7 @@ agent = A2A::Agent.new do
       task = LOCK.acquire { TASKS[task_id] }
       raise A2A::TaskNotFoundError.new(task_id) unless task
 
-      A2A::Schema["List Task Push Notification Configs Response"].new(
+      A2A::Protocol::JsonSchema["List Task Push Notification Configs Response"].new(
         configs:         task[:push_configs] || [],
         next_page_token: "",
       )

@@ -31,15 +31,15 @@ module A2A
 
     # GET /.well-known/agent-card.json
     #
-    # Returns an A2A::Schema["Agent Card"] instance.
+    # Returns an A2A::Protocol::JsonSchema["Agent Card"] instance.
     def agent_card
       response = @conn.get("/.well-known/agent-card.json")
       parsed = response.body
-      A2A::Schema["Agent Card"].new(parsed)
+      A2A::Protocol::JsonSchema["Agent Card"].new(parsed)
     end
 
     # Operations — each maps to a Proto operation name.
-    Proto.operations.each do |op|
+    Protocol::Protobuf.operations.each do |op|
       method_name = op.name.gsub(/([A-Z])/) { "_#{$1.downcase}" }.sub(/^_/, "")
 
       if op.server_streaming?
@@ -110,7 +110,7 @@ module A2A
         request = operation.request_schema.new(params)
         request.valid!
 
-        parser = A2A::SSE::EventParser.new(binding: @binding)
+        parser = A2A::Server::SSE::EventParser.new(binding: @binding)
 
         @conn.post("/") do |req|
           req.options.context = { a2a_operation: operation }
@@ -173,7 +173,7 @@ describe "A2A::Client" do
     end
 
     card = client.agent_card
-    card.should.be.kind_of(A2A::Schema::Definition)
+    card.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     card.name.should == "Test Agent"
     card.version.should == "1.0.0"
   end
@@ -211,7 +211,7 @@ describe "A2A::Client" do
         parts: [{ text: "Hello" }]
       }
     )
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
   end
 
   it "json_rpc: get_task returns a Task" do
@@ -237,7 +237,7 @@ describe "A2A::Client" do
     end
 
     result = client.get_task(id: "task-123")
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     result.id.should == "task-123"
     result.context_id.should == "ctx-456"
   end
@@ -268,7 +268,7 @@ describe "A2A::Client" do
       end
     end
 
-    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Schema::ValidationError)
+    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Protocol::JsonSchema::ValidationError)
   end
 
   it "json_rpc: send_streaming_message sends correct method and Accept header" do
@@ -324,7 +324,7 @@ describe "A2A::Client" do
         parts: [{ text: "Hello" }]
       }
     )
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     captured_env.request_headers["content-type"].should == "application/a2a+json"
   end
 
@@ -344,7 +344,7 @@ describe "A2A::Client" do
     end
 
     result = client.get_task(id: "task-123")
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     result.id.should == "task-123"
   end
 
@@ -362,7 +362,7 @@ describe "A2A::Client" do
     end
 
     result = client.list_tasks
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
   end
 
   it "rest: cancel_task uses POST /tasks/{id}:cancel" do
@@ -378,7 +378,7 @@ describe "A2A::Client" do
     end
 
     result = client.cancel_task(id: "task-123")
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     result.id.should == "task-123"
   end
 
@@ -397,7 +397,7 @@ describe "A2A::Client" do
     result = client.create_task_push_notification_config(
       task_id: "task-123", url: "https://example.com/webhook"
     )
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
   end
 
   it "rest: get_task_push_notification_config uses GET /tasks/{task_id}/pushNotificationConfigs/{id}" do
@@ -413,7 +413,7 @@ describe "A2A::Client" do
     end
 
     result = client.get_task_push_notification_config(id: "config-1", task_id: "task-123")
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
   end
 
   it "rest: list_task_push_notification_configs uses GET /tasks/{task_id}/pushNotificationConfigs" do
@@ -428,7 +428,7 @@ describe "A2A::Client" do
     end
 
     result = client.list_task_push_notification_configs(task_id: "task-123")
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
   end
 
   it "rest: delete_task_push_notification_config uses DELETE /tasks/{task_id}/pushNotificationConfigs/{id}" do
@@ -461,7 +461,7 @@ describe "A2A::Client" do
     end
 
     result = client.get_extended_agent_card
-    result.should.be.kind_of(A2A::Schema::Definition)
+    result.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     result.name.should == "Extended Agent"
   end
 
@@ -504,6 +504,6 @@ describe "A2A::Client" do
       end
     end
 
-    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Schema::ValidationError)
+    lambda { client.send_message(message: "not_a_hash") }.should.raise(A2A::Protocol::JsonSchema::ValidationError)
   end
 end

@@ -6,7 +6,7 @@ require "faraday"
 require "json"
 
 module A2A
-  module Faraday
+  class Client
     module Middleware
       module REST
         # Faraday response middleware for the A2A HTTP+JSON/REST binding.
@@ -59,12 +59,12 @@ module A2A
   end
 end
 
-::Faraday::Response.register_middleware(a2a_rest: A2A::Faraday::Middleware::REST::Response)
+::Faraday::Response.register_middleware(a2a_rest: A2A::Client::Middleware::REST::Response)
 
 __END__
-describe "A2A::Faraday::Middleware::REST::Response" do
-  middleware = A2A::Faraday::Middleware::REST::Response
-  operation = A2A::Proto.operation("GetTask")
+describe "A2A::Client::Middleware::REST::Response" do
+  middleware = A2A::Client::Middleware::REST::Response
+  operation = A2A::Protocol::Protobuf.operation("GetTask")
 
   it "wraps response body in Schema object directly (no envelope)" do
     env = ::Faraday::Env.new
@@ -78,13 +78,13 @@ describe "A2A::Faraday::Middleware::REST::Response" do
 
     middleware.new(nil).on_complete(env)
 
-    env.body.should.be.kind_of(A2A::Schema::Definition)
+    env.body.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     env.body.id.should == "task-123"
     env.body.context_id.should == "ctx-456"
   end
 
   it "returns raw hash when response_schema is nil" do
-    op = A2A::Proto.operation("DeleteTaskPushNotificationConfig")
+    op = A2A::Protocol::Protobuf.operation("DeleteTaskPushNotificationConfig")
     env = ::Faraday::Env.new
     env.status = 200
     env.body = {}
@@ -139,7 +139,7 @@ describe "A2A::Faraday::Middleware::REST::Response" do
 
     middleware.new(nil).on_complete(env)
 
-    env.body.should.be.kind_of(A2A::Schema::Definition)
+    env.body.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     env.body.id.should == "task-1"
   end
 end

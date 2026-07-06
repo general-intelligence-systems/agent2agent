@@ -2,8 +2,8 @@
 
 require "a2a"
 require "a2a/agent"
-require "a2a/proto"
-require "a2a/schema"
+require "a2a/protocol/protobuf"
+require "a2a/protocol/json_schema"
 
 module A2A
   module TestHelpers
@@ -14,19 +14,19 @@ module A2A
       Agent.new do
         on "SendMessage" do
           respond_with -> (env) {
-            A2A::Schema["Send Message Response"].new({})
+            A2A::Protocol::JsonSchema["Send Message Response"].new({})
           }
         end
 
         on "SendStreamingMessage" do
           respond_with -> (env) {
-            A2A::Schema["Stream Response"].new({})
+            A2A::Protocol::JsonSchema["Stream Response"].new({})
           }
         end
 
         on "GetTask" do
           respond_with -> (env) {
-            A2A::Schema["Task"].new(
+            A2A::Protocol::JsonSchema["Task"].new(
               "id"        => "test-id",
               "contextId" => "ctx-1",
               "status"    => { "state" => "TASK_STATE_COMPLETED", "timestamp" => "2025-01-01T00:00:00Z" }
@@ -36,13 +36,13 @@ module A2A
 
         on "ListTasks" do
           respond_with -> (env) {
-            A2A::Schema["List Tasks Response"].new({})
+            A2A::Protocol::JsonSchema["List Tasks Response"].new({})
           }
         end
 
         on "CancelTask" do
           respond_with -> (env) {
-            A2A::Schema["Task"].new(
+            A2A::Protocol::JsonSchema["Task"].new(
               "id"        => "test-id",
               "contextId" => "ctx-1",
               "status"    => { "state" => "TASK_STATE_CANCELED", "timestamp" => "2025-01-01T00:00:00Z" }
@@ -52,31 +52,31 @@ module A2A
 
         on "SubscribeToTask" do
           respond_with -> (env) {
-            A2A::Schema["Stream Response"].new({})
+            A2A::Protocol::JsonSchema["Stream Response"].new({})
           }
         end
 
         on "CreateTaskPushNotificationConfig" do
           respond_with -> (env) {
-            A2A::Schema["Task Push Notification Config"].new("url" => "http://example.com")
+            A2A::Protocol::JsonSchema["Task Push Notification Config"].new("url" => "http://example.com")
           }
         end
 
         on "GetTaskPushNotificationConfig" do
           respond_with -> (env) {
-            A2A::Schema["Task Push Notification Config"].new("url" => "http://example.com")
+            A2A::Protocol::JsonSchema["Task Push Notification Config"].new("url" => "http://example.com")
           }
         end
 
         on "ListTaskPushNotificationConfigs" do
           respond_with -> (env) {
-            A2A::Schema["List Task Push Notification Configs Response"].new({})
+            A2A::Protocol::JsonSchema["List Task Push Notification Configs Response"].new({})
           }
         end
 
         on "GetExtendedAgentCard" do
           respond_with -> (env) {
-            A2A::Schema["Agent Card"].new("name" => "Test", "version" => "1.0")
+            A2A::Protocol::JsonSchema["Agent Card"].new("name" => "Test", "version" => "1.0")
           }
         end
 

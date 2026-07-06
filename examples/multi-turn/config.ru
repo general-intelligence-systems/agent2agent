@@ -2,7 +2,7 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/middleware"
+require "a2a/server/middleware"
 require "async/semaphore"
 require "console"
 require "securerandom"
@@ -24,7 +24,7 @@ agent = A2A::Agent.new do
   #   2. Continuation (taskId present): check if user confirmed, then complete or re-ask
   #
   on "SendMessage" do
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
@@ -80,7 +80,7 @@ agent = A2A::Agent.new do
             TASKS[task_id]
           end
 
-          A2A::Schema["Send Message Response"].new(
+          A2A::Protocol::JsonSchema["Send Message Response"].new(
             task: {
               "id"        => task[:id],
               "contextId" => task[:context_id],
@@ -104,7 +104,7 @@ agent = A2A::Agent.new do
             TASKS[task_id]
           end
 
-          A2A::Schema["Send Message Response"].new(
+          A2A::Protocol::JsonSchema["Send Message Response"].new(
             task: {
               "id"        => task[:id],
               "contextId" => task[:context_id],
@@ -148,7 +148,7 @@ agent = A2A::Agent.new do
           TASKS[task_id]
         end
 
-        A2A::Schema["Send Message Response"].new(
+        A2A::Protocol::JsonSchema["Send Message Response"].new(
           task: {
             "id"        => task[:id],
             "contextId" => task[:context_id],
@@ -165,7 +165,7 @@ agent = A2A::Agent.new do
   end
 
   on "GetTask" do
-    use A2A::Middleware::LimitHistoryLength, 20
+    use A2A::Server::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       request = env["a2a.request"]
       id = request.id
@@ -174,7 +174,7 @@ agent = A2A::Agent.new do
       task = LOCK.acquire { TASKS[id] }
       raise A2A::TaskNotFoundError.new(id) unless task
 
-      A2A::Schema["Task"].new(
+      A2A::Protocol::JsonSchema["Task"].new(
         id:         task[:id],
         context_id: task[:context_id],
         status:     { state: task[:state], timestamp: task[:updated_at] },

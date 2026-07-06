@@ -19,6 +19,7 @@ module A2A
   #   Bindings::Grpc    → /grpc (reserved) → 501 Not Implemented
   #   Bindings::Rest    → /rest (HTTP+JSON/REST)
   #   Bindings::JsonRpc → everything else (JSON-RPC 2.0)
+  #   SSEStream         → offers env["a2a.stream"] to handlers
   #   Triage            → resolves the target operation
   #   Dispatcher        → invokes the registered handler
   #
@@ -27,7 +28,7 @@ module A2A
   #   agent = A2A::Agent.new do
   #     on "SendMessage" do
   #       respond_with -> (env) {
-  #         A2A::Schema["Send Message Response"].new({})
+  #         A2A::Protocol::JsonSchema["Send Message Response"].new({})
   #       }
   #     end
   #   end
@@ -68,6 +69,7 @@ module A2A
         require "a2a/server/bindings/grpc"
         require "a2a/server/bindings/json_rpc"
         require "a2a/server/bindings/rest"
+        require "a2a/server/middleware/sse_stream"
 
         agent_card = @agent_card
         dispatcher = @dispatcher
@@ -78,6 +80,7 @@ module A2A
           use A2A::Server::Bindings::Grpc,    path_prefix: "/grpc"
           use A2A::Server::Bindings::Rest,    path_prefix: "/rest"
           use A2A::Server::Bindings::JsonRpc, path_prefix: "/"
+          use A2A::Server::Middleware::SSEStream
           use A2A::Server::Triage
           run dispatcher
         end

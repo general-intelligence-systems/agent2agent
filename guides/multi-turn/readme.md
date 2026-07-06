@@ -33,6 +33,6 @@ on "SendMessage" do |request|
   end
 
   task = store.get(task_id)
-  respond A2A::Schema["Send Message Response"].new(task: { ... })
+  respond A2A::Protocol::JsonSchema["Send Message Response"].new(task: { ... })
 end
 ```

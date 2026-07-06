@@ -6,9 +6,9 @@ require "faraday"
 require "json"
 
 module A2A
-  module Faraday
+  class Client
     module Middleware
-      # Faraday request middleware that converts A2A::Schema::Definition
+      # Faraday request middleware that converts A2A::Protocol::JsonSchema::Definition
       # objects into their hash representation for JSON serialization.
       #
       # Place this before the :json request middleware in the stack so
@@ -18,7 +18,7 @@ module A2A
       class SchemaRequest < ::Faraday::Middleware
         def on_request(env)
           body = env.body
-          return unless body.is_a?(A2A::Schema::Definition)
+          return unless body.is_a?(A2A::Protocol::JsonSchema::Definition)
 
           env.body = body.to_h
           env.request_headers["content-type"] ||= "application/json"
@@ -28,14 +28,14 @@ module A2A
   end
 end
 
-::Faraday::Request.register_middleware(a2a_schema: A2A::Faraday::Middleware::SchemaRequest)
+::Faraday::Request.register_middleware(a2a_schema: A2A::Client::Middleware::SchemaRequest)
 
 __END__
-describe "A2A::Faraday::Middleware::SchemaRequest" do
-  middleware = A2A::Faraday::Middleware::SchemaRequest
+describe "A2A::Client::Middleware::SchemaRequest" do
+  middleware = A2A::Client::Middleware::SchemaRequest
 
   it "converts Schema::Definition to hash" do
-    schema_obj = A2A::Schema["Agent Capabilities"].new(streaming: true)
+    schema_obj = A2A::Protocol::JsonSchema["Agent Capabilities"].new(streaming: true)
     env = ::Faraday::Env.new
     env.body = schema_obj
     env.request_headers = {}
@@ -58,7 +58,7 @@ describe "A2A::Faraday::Middleware::SchemaRequest" do
   end
 
   it "does not overwrite existing content-type" do
-    schema_obj = A2A::Schema["Agent Capabilities"].new(streaming: true)
+    schema_obj = A2A::Protocol::JsonSchema["Agent Capabilities"].new(streaming: true)
     env = ::Faraday::Env.new
     env.body = schema_obj
     env.request_headers = { "content-type" => "application/a2a+json" }

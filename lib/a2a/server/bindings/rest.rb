@@ -2,7 +2,7 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/sse"
+require "a2a/server/sse"
 
 module A2A
   class Server
@@ -57,7 +57,7 @@ module A2A
         # Check if handler set up a streaming response.
         # The stream is an SSE::Stream (Protocol::HTTP::Body::Readable).
         if (stream = env["a2a.stream"])
-          return [200, A2A::SSE::Stream.headers, stream]
+          return [200, A2A::Server::SSE::Stream.headers, stream]
         end
 
         success_response(result)
@@ -97,7 +97,7 @@ describe "A2A::Server::Bindings::REST" do
   server.register(A2A::TestHelpers.stub_agent)
   rack = Rack::MockRequest.new(server)
 
-  A2A::Proto.operations.each do |op|
+  A2A::Protocol::Protobuf.operations.each do |op|
     it "#{op.rest_verb.upcase} #{op.rest_path} returns valid #{op.response_type}" do
       # Build request path, replacing {id=*} etc with a placeholder value
       path = "/rest" + op.rest_path.gsub(/\{[^}]+\}/, "test-id")

@@ -58,14 +58,14 @@ module A2A
 
         def resolve_operation(env)
           if env["a2a.json_rpc_method"]
-            Proto.operation(env["a2a.json_rpc_method"])
+            Protocol::Protobuf.operation(env["a2a.json_rpc_method"])
           elsif env["a2a.verb"] && env["a2a.path"]
             match_rest_operation(env["a2a.verb"], env["a2a.path"])
           end
         end
 
         def match_rest_operation(verb, path)
-          Proto.operations.find do |op|
+          Protocol::Protobuf.operations.find do |op|
             op.http_bindings.any? do |b|
               b.verb == verb && path_matches?(b.path, path)
             end

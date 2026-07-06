@@ -2,8 +2,8 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/sse"
-require "a2a/middleware"
+require "a2a/server/sse"
+require "a2a/server/middleware"
 require "async/semaphore"
 require "console"
 require "securerandom"
@@ -20,7 +20,7 @@ TERMINAL_STATES = %w[TASK_STATE_COMPLETED TASK_STATE_CANCELLED TASK_STATE_FAILED
 agent = A2A::Agent.new do
 
   on "SendMessage" do
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::ExtractMessage
     respond_with -> (env) {
       request    = env["a2a.request"]
       msg        = request.message
@@ -67,7 +67,7 @@ agent = A2A::Agent.new do
         TASKS[task_id]
       end
 
-      A2A::Schema["Send Message Response"].new(
+      A2A::Protocol::JsonSchema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
           "contextId" => task[:context_id],
@@ -80,11 +80,10 @@ agent = A2A::Agent.new do
   end
 
   # Returns results as SSE events via Falcon-native async streaming.
-  # Uses A2A::SSE::Stream (Protocol::HTTP::Body::Writable) -- no threads.
+  # Uses A2A::Server::SSE::Stream (Protocol::HTTP::Body::Writable) -- no threads.
   #
   on "SendStreamingMessage" do
-    use A2A::Middleware::SSEStream
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
@@ -150,7 +149,7 @@ agent = A2A::Agent.new do
   end
 
   on "GetTask" do
-    use A2A::Middleware::LimitHistoryLength, 20
+    use A2A::Server::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       request = env["a2a.request"]
       id = request.id
@@ -159,7 +158,7 @@ agent = A2A::Agent.new do
       task = LOCK.acquire { TASKS[id] }
       raise A2A::TaskNotFoundError.new(id) unless task
 
-      A2A::Schema["Task"].new(
+      A2A::Protocol::JsonSchema["Task"].new(
         id:         task[:id],
         context_id: task[:context_id],
         status:     { state: task[:state], timestamp: task[:updated_at] },
@@ -170,8 +169,8 @@ agent = A2A::Agent.new do
   end
 
   on "ListTasks" do
-    use A2A::Middleware::LimitPaginationSize, 50
-    use A2A::Middleware::LimitHistoryLength, 20
+    use A2A::Server::Middleware::LimitPaginationSize, 50
+    use A2A::Server::Middleware::LimitHistoryLength, 20
     respond_with -> (env) {
       request    = env["a2a.request"]
       page_size  = env["a2a.page_size"]
@@ -212,7 +211,7 @@ agent = A2A::Agent.new do
         task_h
       end
 
-      A2A::Schema["List Tasks Response"].new(
+      A2A::Protocol::JsonSchema["List Tasks Response"].new(
         tasks:           tasks_json,
         next_page_token: next_token,
         page_size:       page_size,
@@ -236,7 +235,7 @@ agent = A2A::Agent.new do
         TASKS[id]
       end
 
-      A2A::Schema["Task"].new(
+      A2A::Protocol::JsonSchema["Task"].new(
         id:         task[:id],
         context_id: task[:context_id],
         status:     { "state" => task[:state], "timestamp" => task[:updated_at] },

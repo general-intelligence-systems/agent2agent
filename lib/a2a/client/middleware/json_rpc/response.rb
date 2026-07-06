@@ -6,11 +6,11 @@ require "faraday"
 require "json"
 
 module A2A
-  module Faraday
+  class Client
     module Middleware
       module JsonRpc
         # Faraday response middleware that unwraps JSON-RPC 2.0 responses
-        # and converts the result into A2A::Schema::Definition objects.
+        # and converts the result into A2A::Protocol::JsonSchema::Definition objects.
         #
         # Reads env.request.context[:a2a_operation] to determine which
         # Schema class to instantiate. If no operation is set, passes through.
@@ -55,12 +55,12 @@ module A2A
   end
 end
 
-::Faraday::Response.register_middleware(a2a_json_rpc: A2A::Faraday::Middleware::JsonRpc::Response)
+::Faraday::Response.register_middleware(a2a_json_rpc: A2A::Client::Middleware::JsonRpc::Response)
 
 __END__
-describe "A2A::Faraday::Middleware::JsonRpc::Response" do
-  middleware = A2A::Faraday::Middleware::JsonRpc::Response
-  operation = A2A::Proto.operation("GetTask")
+describe "A2A::Client::Middleware::JsonRpc::Response" do
+  middleware = A2A::Client::Middleware::JsonRpc::Response
+  operation = A2A::Protocol::Protobuf.operation("GetTask")
 
   it "unwraps JSON-RPC result into Schema object" do
     env = ::Faraday::Env.new
@@ -76,7 +76,7 @@ describe "A2A::Faraday::Middleware::JsonRpc::Response" do
 
     middleware.new(nil).on_complete(env)
 
-    env.body.should.be.kind_of(A2A::Schema::Definition)
+    env.body.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     env.body.id.should == "task-123"
     env.body.context_id.should == "ctx-456"
   end
@@ -94,7 +94,7 @@ describe "A2A::Faraday::Middleware::JsonRpc::Response" do
   end
 
   it "returns raw hash when response_schema is nil" do
-    op = A2A::Proto.operation("DeleteTaskPushNotificationConfig")
+    op = A2A::Protocol::Protobuf.operation("DeleteTaskPushNotificationConfig")
     env = ::Faraday::Env.new
     env.body = { "jsonrpc" => "2.0", "id" => 1, "result" => {} }
     env.request = ::Faraday::RequestOptions.new
@@ -126,7 +126,7 @@ describe "A2A::Faraday::Middleware::JsonRpc::Response" do
 
     middleware.new(nil).on_complete(env)
 
-    env.body.should.be.kind_of(A2A::Schema::Definition)
+    env.body.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     env.body.id.should == "task-1"
   end
 end

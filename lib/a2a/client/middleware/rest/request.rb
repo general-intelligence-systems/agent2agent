@@ -5,7 +5,7 @@ require "a2a"
 require "faraday"
 
 module A2A
-  module Faraday
+  class Client
     module Middleware
       module REST
         # Faraday request middleware that rewrites the request for the
@@ -81,14 +81,14 @@ module A2A
   end
 end
 
-::Faraday::Request.register_middleware(a2a_rest: A2A::Faraday::Middleware::REST::Request)
+::Faraday::Request.register_middleware(a2a_rest: A2A::Client::Middleware::REST::Request)
 
 __END__
-describe "A2A::Faraday::Middleware::REST::Request" do
-  middleware = A2A::Faraday::Middleware::REST::Request
+describe "A2A::Client::Middleware::REST::Request" do
+  middleware = A2A::Client::Middleware::REST::Request
 
   it "rewrites POST operation with correct path, verb, and content-type" do
-    operation = A2A::Proto.operation("SendMessage")
+    operation = A2A::Protocol::Protobuf.operation("SendMessage")
     env = ::Faraday::Env.new
     env.url = URI.parse("http://localhost:9292/")
     env.body = { "message" => { "role" => "ROLE_USER" } }
@@ -106,7 +106,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
   end
 
   it "rewrites GET operation with path interpolation and query params" do
-    operation = A2A::Proto.operation("GetTask")
+    operation = A2A::Protocol::Protobuf.operation("GetTask")
     env = ::Faraday::Env.new
     env.url = URI.parse("http://localhost:9292/")
     env.body = { "id" => "task-123", "historyLength" => "5" }
@@ -124,7 +124,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
   end
 
   it "rewrites DELETE operation with multi-param path interpolation" do
-    operation = A2A::Proto.operation("DeleteTaskPushNotificationConfig")
+    operation = A2A::Protocol::Protobuf.operation("DeleteTaskPushNotificationConfig")
     env = ::Faraday::Env.new
     env.url = URI.parse("http://localhost:9292/")
     env.body = { "taskId" => "task-123", "id" => "config-1" }
@@ -141,7 +141,7 @@ describe "A2A::Faraday::Middleware::REST::Request" do
   end
 
   it "rewrites POST cancel with path interpolation" do
-    operation = A2A::Proto.operation("CancelTask")
+    operation = A2A::Protocol::Protobuf.operation("CancelTask")
     env = ::Faraday::Env.new
     env.url = URI.parse("http://localhost:9292/")
     env.body = { "id" => "task-123", "metadata" => { "key" => "val" } }

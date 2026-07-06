@@ -13,7 +13,7 @@ module A2A
     # that reads env["a2a.operation"] set by Triage, looks up the matching
     # route, and calls it.
     #
-    # Returns domain objects (A2A::Schema::Definition or A2A::Error) —
+    # Returns domain objects (A2A::Protocol::JsonSchema::Definition or A2A::Error) —
     # the binding layer is responsible for formatting these into HTTP.
     #
     class Dispatcher
@@ -25,7 +25,7 @@ module A2A
       #
       # The handler must respond to:
       #   #operations -> Array(String)  (e.g. ["SendMessage", "GetTask"])
-      #   #call(env)  -> A2A::Schema::Definition | A2A::Error
+      #   #call(env)  -> A2A::Protocol::JsonSchema::Definition | A2A::Error
       #
       def register(handler)
         handler.operations.each do |op|

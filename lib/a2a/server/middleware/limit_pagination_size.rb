@@ -4,54 +4,56 @@ require "bundler/setup"
 require "a2a"
 
 module A2A
-  module Middleware
-    # Clamps `request.page_size` to a valid range and sets
-    # `env["a2a.page_size"]` for downstream handlers.
-    #
-    # Accepts a single integer — the maximum page size (also used as the
-    # default when the client doesn't specify one). Clamps to [1, max].
-    #
-    # Usage:
-    #
-    #   on "ListTasks" do
-    #     use A2A::Middleware::LimitPaginationSize, 50
-    #     respond_with -> (env) {
-    #       page_size = env["a2a.page_size"]
-    #       # ...
-    #     }
-    #   end
-    #
-    class LimitPaginationSize
-      def initialize(app, max = 100)
-        @app = app
-        @max = max
-      end
-
-      def call(env)
-        request = env["a2a.request"]
-
-        page_size = @max
-        if request.respond_to?(:page_size) && request.page_size
-          ps = request.page_size.to_i
-          page_size = [[ps, 1].max, @max].min
+  class Server
+    module Middleware
+      # Clamps `request.page_size` to a valid range and sets
+      # `env["a2a.page_size"]` for downstream handlers.
+      #
+      # Accepts a single integer — the maximum page size (also used as the
+      # default when the client doesn't specify one). Clamps to [1, max].
+      #
+      # Usage:
+      #
+      #   on "ListTasks" do
+      #     use A2A::Server::Middleware::LimitPaginationSize, 50
+      #     respond_with -> (env) {
+      #       page_size = env["a2a.page_size"]
+      #       # ...
+      #     }
+      #   end
+      #
+      class LimitPaginationSize
+        def initialize(app, max = 100)
+          @app = app
+          @max = max
         end
 
-        env["a2a.page_size"] = page_size
+        def call(env)
+          request = env["a2a.request"]
 
-        @app.call(env)
+          page_size = @max
+          if request.respond_to?(:page_size) && request.page_size
+            ps = request.page_size.to_i
+            page_size = [[ps, 1].max, @max].min
+          end
+
+          env["a2a.page_size"] = page_size
+
+          @app.call(env)
+        end
       end
     end
-  end
+end
 end
 
 __END__
-  describe "A2A::Middleware::LimitPaginationSize" do
+  describe "A2A::Server::Middleware::LimitPaginationSize" do
     it "uses max as default page size when not specified by client" do
       request = Object.new
       request.define_singleton_method(:page_size) { nil }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream)
       env = { "a2a.request" => request }
 
       result = mw.call(env)
@@ -63,7 +65,7 @@ __END__
       request.define_singleton_method(:page_size) { nil }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream, 25)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream, 25)
       env = { "a2a.request" => request }
 
       result = mw.call(env)
@@ -75,7 +77,7 @@ __END__
       request.define_singleton_method(:page_size) { 0 }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream)
       env = { "a2a.request" => request }
 
       result = mw.call(env)
@@ -87,7 +89,7 @@ __END__
       request.define_singleton_method(:page_size) { 999 }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream)
       env = { "a2a.request" => request }
 
       result = mw.call(env)
@@ -99,7 +101,7 @@ __END__
       request.define_singleton_method(:page_size) { 999 }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream, 50)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream, 50)
       env = { "a2a.request" => request }
 
       result = mw.call(env)
@@ -111,7 +113,7 @@ __END__
       request.define_singleton_method(:page_size) { 30 }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream)
       env = { "a2a.request" => request }
 
       result = mw.call(env)
@@ -123,7 +125,7 @@ __END__
       request.define_singleton_method(:page_size) { "20" }
 
       downstream = -> (env) { env["a2a.page_size"] }
-      mw = A2A::Middleware::LimitPaginationSize.new(downstream)
+      mw = A2A::Server::Middleware::LimitPaginationSize.new(downstream)
       env = { "a2a.request" => request }
 
       result = mw.call(env)

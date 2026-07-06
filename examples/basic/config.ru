@@ -10,13 +10,13 @@ agent_card = YAML.safe_load_file(File.join(__dir__, "agent_card.yml"))
 agent = A2A::Agent.new do
   on "SendMessage" do
     respond_with -> (env) {
-      A2A::Schema["Send Message Response"].new({})
+      A2A::Protocol::JsonSchema["Send Message Response"].new({})
     }
   end
 
   on "GetTask" do
     respond_with -> (env) {
-      A2A::Schema["Task"].new({})
+      A2A::Protocol::JsonSchema["Task"].new({})
     }
   end
 end

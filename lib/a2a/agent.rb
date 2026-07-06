@@ -13,7 +13,7 @@ module A2A
   #   agent = A2A::Agent.new do
   #     on "SendMessage" do
   #       respond_with -> (env) {
-  #         A2A::Schema["Send Message Response"].new({})
+  #         A2A::Protocol::JsonSchema["Send Message Response"].new({})
   #       }
   #     end
   #
@@ -184,7 +184,7 @@ __END__
     end
 
     it "returns a Schema::Definition from respond_with" do
-      schema_obj = A2A::Schema["Task"].new(
+      schema_obj = A2A::Protocol::JsonSchema["Task"].new(
         "id"        => "t-1",
         "contextId" => "c-1",
         "status"    => { "state" => "TASK_STATE_COMPLETED", "timestamp" => "2025-01-01T00:00:00.000Z" },

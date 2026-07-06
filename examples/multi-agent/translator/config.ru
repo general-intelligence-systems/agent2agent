@@ -2,7 +2,7 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/middleware"
+require "a2a/server/middleware"
 require "async/semaphore"
 require "brute"
 require "console"
@@ -35,7 +35,7 @@ NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 agent = A2A::Agent.new do
   on "SendMessage" do
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::ExtractMessage
     respond_with -> (env) {
       request = env["a2a.request"]
       msg = request.message
@@ -75,7 +75,7 @@ agent = A2A::Agent.new do
         TASKS[task_id]
       end
 
-      A2A::Schema["Send Message Response"].new(
+      A2A::Protocol::JsonSchema["Send Message Response"].new(
         task: {
           "id"        => task[:id],
           "contextId" => task[:context_id],

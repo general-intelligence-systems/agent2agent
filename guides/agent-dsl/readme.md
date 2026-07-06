@@ -18,19 +18,19 @@ Handlers are registered with `on`. Inside a handler block you have access to:
 agent = A2A::Agent.new do
   on "SendMessage" do |request|
     # request.message, request.configuration, etc.
-    respond A2A::Schema["Send Message Response"].new(task: { ... })
+    respond A2A::Protocol::JsonSchema["Send Message Response"].new(task: { ... })
   end
 
   on "GetTask" do |request|
     task = store.get(request.id)
-    respond A2A::Schema["Task"].new(id: task[:id], ...)
+    respond A2A::Protocol::JsonSchema["Task"].new(id: task[:id], ...)
   end
 
   # Handle multiple operations with one block
   on "CancelTask" do |request|
     store.cancel(request.id)
     task = store.get(request.id)
-    respond A2A::Schema["Task"].new(id: task[:id], ...)
+    respond A2A::Protocol::JsonSchema["Task"].new(id: task[:id], ...)
   end
 end
 

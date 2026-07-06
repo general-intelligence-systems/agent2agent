@@ -5,7 +5,7 @@ require "a2a"
 require "faraday"
 
 module A2A
-  module Faraday
+  class Client
     module Middleware
       module JsonRpc
         # Faraday request middleware that wraps the request body in a
@@ -41,12 +41,12 @@ module A2A
   end
 end
 
-::Faraday::Request.register_middleware(a2a_json_rpc: A2A::Faraday::Middleware::JsonRpc::Request)
+::Faraday::Request.register_middleware(a2a_json_rpc: A2A::Client::Middleware::JsonRpc::Request)
 
 __END__
-describe "A2A::Faraday::Middleware::JsonRpc::Request" do
-  middleware = A2A::Faraday::Middleware::JsonRpc::Request
-  operation = A2A::Proto.operation("SendMessage")
+describe "A2A::Client::Middleware::JsonRpc::Request" do
+  middleware = A2A::Client::Middleware::JsonRpc::Request
+  operation = A2A::Protocol::Protobuf.operation("SendMessage")
 
   it "wraps body in JSON-RPC 2.0 envelope and sets path to /" do
     env = ::Faraday::Env.new

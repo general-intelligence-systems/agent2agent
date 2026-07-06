@@ -4,250 +4,252 @@ require "bundler/setup"
 require "a2a"
 
 module A2A
-  # Schema-validated A2A protocol objects, powered by json_schemer.
-  #
-  # Loads the bundled data/a2a.json schema, rewrites external $ref
-  # values to internal #/definitions/... pointers, and dynamically
-  # generates Definition subclasses for each type.
-  #
-  #   A2A::Schema["Agent Capabilities"]
-  #   #=> Class < Definition with .schema, .valid?, reader methods
-  #
-  #   A2A::Schema["Agent Card"]
-  #   #=> Class < Definition
-  #
-  #   A2A::Schema.list_definitions
-  #   #=> ["API Key Security Scheme", "Agent Capabilities", ...]
-  #
-  module Schema
-    DATA_PATH = File.expand_path("../../data/a2a.json", __dir__).freeze
+  module Protocol
+    # Schema-validated A2A protocol objects, powered by json_schemer.
+    #
+    # Loads the bundled data/a2a.json schema, rewrites external $ref
+    # values to internal #/definitions/... pointers, and dynamically
+    # generates Definition subclasses for each type.
+    #
+    #   A2A::Protocol::JsonSchema["Agent Capabilities"]
+    #   #=> Class < Definition with .schema, .valid?, reader methods
+    #
+    #   A2A::Protocol::JsonSchema["Agent Card"]
+    #   #=> Class < Definition
+    #
+    #   A2A::Protocol::JsonSchema.list_definitions
+    #   #=> ["API Key Security Scheme", "Agent Capabilities", ...]
+    #
+    module JsonSchema
+      DATA_PATH = File.expand_path("../../../data/a2a.json", __dir__).freeze
 
-    @definition_classes = {}
-    @schemer = nil
-    @raw_schema = nil
-    @ref_map = nil
+      @definition_classes = {}
+      @schemer = nil
+      @raw_schema = nil
+      @ref_map = nil
 
-    class << self
-      # Look up a definition by title.
-      #
-      #   A2A::Schema["Agent Capabilities"]
-      #   #=> Class < Definition
-      #
-      def [](name)
-        @definition_classes[name] ||= begin
-          definitions = raw_schema.fetch("definitions", {})
-
-          unless definitions.key?(name)
-            raise "No A2A definition found for #{name.inspect}!" \
-              "\nAvailable: #{list_definitions.join(", ")}"
-          end
-
-          encoded = URI::DEFAULT_PARSER.escape(name)
-          ref_schema = schemer.ref("#/definitions/#{encoded}")
-          build_definition_class(ref_schema, name, definitions[name])
-        end
-      end
-
-      # All available definition titles, sorted.
-      #
-      #   A2A::Schema.list_definitions
-      #   #=> ["API Key Security Scheme", "Agent Capabilities", ...]
-      #
-      def list_definitions
-        raw_schema.fetch("definitions", {}).keys.sort
-      end
-
-      # The JSONSchemer instance for the full A2A schema bundle.
-      # Cached after first access.
-      def schemer
-        @schemer ||= JSONSchemer.schema(raw_schema)
-      end
-
-      # The parsed + ref-rewritten JSON schema hash.
-      def raw_schema
-        @raw_schema ||= load_and_rewrite_schema
-      end
-
-      # Reset all cached state (useful for tests).
-      def reset!
-        @definition_classes.clear
-        @schemer = nil
-        @raw_schema = nil
-        @ref_map = nil
-      end
-
-      private
-
-        # Load data/a2a.json, build the $ref rewrite map, and
-        # walk the entire tree replacing external refs with internal ones.
-        def load_and_rewrite_schema
-          schema = JSON.parse(File.read(DATA_PATH))
-          map    = build_ref_map(schema)
-          rewrite_refs!(schema, map)
-          schema
-        end
-
-        # Build a map from external $ref strings to internal
-        # #/definitions/Title pointers.
-        def build_ref_map(schema)
-          return @ref_map if @ref_map
-
-          definitions = schema.fetch("definitions", {})
-
-          pascal_to_title = {}
-          definitions.each_key do |title|
-            pascal = title.gsub(/\s+/, "")
-            pascal_to_title[pascal] = title
-          end
-
-          refs = collect_refs(schema)
-
-          map = {}
-          refs.each do |ref_str|
-            type_name = ref_str
-              .sub(/\.jsonschema\.json\z/, "")
-              .split(".")
-              .last
-
-            if (title = pascal_to_title[type_name])
-              encoded = URI::DEFAULT_PARSER.escape(title)
-              map[ref_str] = "#/definitions/#{encoded}"
-            end
-          end
-
-          @ref_map = map
-        end
-
-        # Recursively collect all $ref string values from a JSON tree.
-        def collect_refs(obj, refs = Set.new)
-          case obj
-          when Hash
-            obj.each do |k, v|
-              if k == "$ref" && v.is_a?(String) && !v.start_with?("#")
-                refs << v
-              else
-                collect_refs(v, refs)
-              end
-            end
-          when Array
-            obj.each { |v| collect_refs(v, refs) }
-          end
-          refs
-        end
-
-        # Walk the schema tree and replace all external $ref values
-        # with their internal #/definitions/... equivalents.
-        def rewrite_refs!(obj, map)
-          case obj
-          when Hash
-            obj.each do |k, v|
-              if k == "$ref" && v.is_a?(String) && map.key?(v)
-                obj[k] = map[v]
-              else
-                rewrite_refs!(v, map)
-              end
-            end
-          when Array
-            obj.each { |v| rewrite_refs!(v, map) }
-          end
-        end
-
-        # Build a Definition subclass for a specific A2A type.
-        def build_definition_class(schema_instance, definition_name, raw_definition)
-          properties     = raw_definition.fetch("properties", {})
-          camel_keys     = properties.keys
-          snake_to_camel = build_snake_to_camel(camel_keys)
-          prop_refs      = build_property_refs(properties)
-
-          reader_pairs = camel_keys.map { |ck| [camel_to_snake(ck).to_sym, ck] }
-
-          Class.new(Definition) do
-            @schema            = schema_instance
-            @definition_name   = definition_name
-            @schema_properties = camel_keys
-            @snake_to_camel    = snake_to_camel
-            @property_refs     = prop_refs
-
-            class << self
-              def schema           = @schema
-              def definition_name  = @definition_name
-              def schema_properties = @schema_properties
-              def snake_to_camel_map = @snake_to_camel
-              def property_refs    = @property_refs
-            end
-
-            reader_pairs.each do |snake_sym, camel_key|
-              define_method(snake_sym) { @data[camel_key] }
-            end
-          end
-        end
-
-        # Inspect each property's raw schema for $ref pointers and build
-        # a map of { camelKey => [:kind, "Definition Title"] } so that
-        # Definition#initialize can auto-wrap nested Hashes.
+      class << self
+        # Look up a definition by title.
         #
-        # Three patterns:
-        #   :object  — direct $ref        (e.g. task → Task)
-        #   :array   — items.$ref          (e.g. artifacts → [Artifact, ...])
-        #   :map     — additionalProperties.$ref (e.g. securitySchemes → {k => SecurityScheme})
-        def build_property_refs(properties)
-          definitions = raw_schema.fetch("definitions", {})
-          refs = {}
+        #   A2A::Protocol::JsonSchema["Agent Capabilities"]
+        #   #=> Class < Definition
+        #
+        def [](name)
+          @definition_classes[name] ||= begin
+            definitions = raw_schema.fetch("definitions", {})
 
-          properties.each do |camel_key, prop_schema|
-            if (ref = prop_schema["$ref"])
-              # Direct $ref — singular nested object
-              title = ref_title_for(ref)
-              if title && definitions.dig(title, "properties")
-                refs[camel_key] = [:object, title]
+            unless definitions.key?(name)
+              raise "No A2A definition found for #{name.inspect}!" \
+                "\nAvailable: #{list_definitions.join(", ")}"
+            end
+
+            encoded = URI::DEFAULT_PARSER.escape(name)
+            ref_schema = schemer.ref("#/definitions/#{encoded}")
+            build_definition_class(ref_schema, name, definitions[name])
+          end
+        end
+
+        # All available definition titles, sorted.
+        #
+        #   A2A::Protocol::JsonSchema.list_definitions
+        #   #=> ["API Key Security Scheme", "Agent Capabilities", ...]
+        #
+        def list_definitions
+          raw_schema.fetch("definitions", {}).keys.sort
+        end
+
+        # The JSONSchemer instance for the full A2A schema bundle.
+        # Cached after first access.
+        def schemer
+          @schemer ||= JSONSchemer.schema(raw_schema)
+        end
+
+        # The parsed + ref-rewritten JSON schema hash.
+        def raw_schema
+          @raw_schema ||= load_and_rewrite_schema
+        end
+
+        # Reset all cached state (useful for tests).
+        def reset!
+          @definition_classes.clear
+          @schemer = nil
+          @raw_schema = nil
+          @ref_map = nil
+        end
+
+        private
+
+          # Load data/a2a.json, build the $ref rewrite map, and
+          # walk the entire tree replacing external refs with internal ones.
+          def load_and_rewrite_schema
+            schema = JSON.parse(File.read(DATA_PATH))
+            map    = build_ref_map(schema)
+            rewrite_refs!(schema, map)
+            schema
+          end
+
+          # Build a map from external $ref strings to internal
+          # #/definitions/Title pointers.
+          def build_ref_map(schema)
+            return @ref_map if @ref_map
+
+            definitions = schema.fetch("definitions", {})
+
+            pascal_to_title = {}
+            definitions.each_key do |title|
+              pascal = title.gsub(/\s+/, "")
+              pascal_to_title[pascal] = title
+            end
+
+            refs = collect_refs(schema)
+
+            map = {}
+            refs.each do |ref_str|
+              type_name = ref_str
+                .sub(/\.jsonschema\.json\z/, "")
+                .split(".")
+                .last
+
+              if (title = pascal_to_title[type_name])
+                encoded = URI::DEFAULT_PARSER.escape(title)
+                map[ref_str] = "#/definitions/#{encoded}"
               end
-            elsif prop_schema["type"] == "array" && (ref = prop_schema.dig("items", "$ref"))
-              # Array with $ref items
-              title = ref_title_for(ref)
-              if title && definitions.dig(title, "properties")
-                refs[camel_key] = [:array, title]
+            end
+
+            @ref_map = map
+          end
+
+          # Recursively collect all $ref string values from a JSON tree.
+          def collect_refs(obj, refs = Set.new)
+            case obj
+            when Hash
+              obj.each do |k, v|
+                if k == "$ref" && v.is_a?(String) && !v.start_with?("#")
+                  refs << v
+                else
+                  collect_refs(v, refs)
+                end
               end
-            elsif prop_schema["type"] == "object" && (ref = prop_schema.dig("additionalProperties", "$ref"))
-              # Map with $ref additionalProperties
-              title = ref_title_for(ref)
-              if title && definitions.dig(title, "properties")
-                refs[camel_key] = [:map, title]
+            when Array
+              obj.each { |v| collect_refs(v, refs) }
+            end
+            refs
+          end
+
+          # Walk the schema tree and replace all external $ref values
+          # with their internal #/definitions/... equivalents.
+          def rewrite_refs!(obj, map)
+            case obj
+            when Hash
+              obj.each do |k, v|
+                if k == "$ref" && v.is_a?(String) && map.key?(v)
+                  obj[k] = map[v]
+                else
+                  rewrite_refs!(v, map)
+                end
+              end
+            when Array
+              obj.each { |v| rewrite_refs!(v, map) }
+            end
+          end
+
+          # Build a Definition subclass for a specific A2A type.
+          def build_definition_class(schema_instance, definition_name, raw_definition)
+            properties     = raw_definition.fetch("properties", {})
+            camel_keys     = properties.keys
+            snake_to_camel = build_snake_to_camel(camel_keys)
+            prop_refs      = build_property_refs(properties)
+
+            reader_pairs = camel_keys.map { |ck| [camel_to_snake(ck).to_sym, ck] }
+
+            Class.new(Definition) do
+              @schema            = schema_instance
+              @definition_name   = definition_name
+              @schema_properties = camel_keys
+              @snake_to_camel    = snake_to_camel
+              @property_refs     = prop_refs
+
+              class << self
+                def schema           = @schema
+                def definition_name  = @definition_name
+                def schema_properties = @schema_properties
+                def snake_to_camel_map = @snake_to_camel
+                def property_refs    = @property_refs
+              end
+
+              reader_pairs.each do |snake_sym, camel_key|
+                define_method(snake_sym) { @data[camel_key] }
               end
             end
           end
 
-          refs
-        end
+          # Inspect each property's raw schema for $ref pointers and build
+          # a map of { camelKey => [:kind, "Definition Title"] } so that
+          # Definition#initialize can auto-wrap nested Hashes.
+          #
+          # Three patterns:
+          #   :object  — direct $ref        (e.g. task → Task)
+          #   :array   — items.$ref          (e.g. artifacts → [Artifact, ...])
+          #   :map     — additionalProperties.$ref (e.g. securitySchemes → {k => SecurityScheme})
+          def build_property_refs(properties)
+            definitions = raw_schema.fetch("definitions", {})
+            refs = {}
 
-        # Extract the definition title from an internal $ref pointer.
-        # e.g. "#/definitions/Task%20Status" => "Task Status"
-        def ref_title_for(ref)
-          return nil unless ref.start_with?("#/definitions/")
+            properties.each do |camel_key, prop_schema|
+              if (ref = prop_schema["$ref"])
+                # Direct $ref — singular nested object
+                title = ref_title_for(ref)
+                if title && definitions.dig(title, "properties")
+                  refs[camel_key] = [:object, title]
+                end
+              elsif prop_schema["type"] == "array" && (ref = prop_schema.dig("items", "$ref"))
+                # Array with $ref items
+                title = ref_title_for(ref)
+                if title && definitions.dig(title, "properties")
+                  refs[camel_key] = [:array, title]
+                end
+              elsif prop_schema["type"] == "object" && (ref = prop_schema.dig("additionalProperties", "$ref"))
+                # Map with $ref additionalProperties
+                title = ref_title_for(ref)
+                if title && definitions.dig(title, "properties")
+                  refs[camel_key] = [:map, title]
+                end
+              end
+            end
 
-          URI::DEFAULT_PARSER.unescape(ref.sub("#/definitions/", ""))
-        end
-
-        def build_snake_to_camel(camel_keys)
-          map = {}
-          camel_keys.each do |camel|
-            snake = camel_to_snake(camel)
-            map[snake] = camel
-            map[camel] = camel
+            refs
           end
-          map
-        end
 
-        def camel_to_snake(str)
-          str.gsub(/([A-Z])/) { "_#{$1.downcase}" }
-             .delete_prefix("_")
-        end
+          # Extract the definition title from an internal $ref pointer.
+          # e.g. "#/definitions/Task%20Status" => "Task Status"
+          def ref_title_for(ref)
+            return nil unless ref.start_with?("#/definitions/")
+
+            URI::DEFAULT_PARSER.unescape(ref.sub("#/definitions/", ""))
+          end
+
+          def build_snake_to_camel(camel_keys)
+            map = {}
+            camel_keys.each do |camel|
+              snake = camel_to_snake(camel)
+              map[snake] = camel
+              map[camel] = camel
+            end
+            map
+          end
+
+          def camel_to_snake(str)
+            str.gsub(/([A-Z])/) { "_#{$1.downcase}" }
+               .delete_prefix("_")
+          end
+      end
     end
   end
 end
 
 __END__
-describe "A2A::Schema" do
-  schema = A2A::Schema
+describe "A2A::Protocol::JsonSchema" do
+  schema = A2A::Protocol::JsonSchema
 
   it "loads the raw schema" do
     schema.raw_schema.should.be.kind_of(Hash)
@@ -292,7 +294,7 @@ describe "A2A::Schema" do
   it "returns a Class that subclasses Definition" do
     klass = schema["Agent Capabilities"]
     klass.should.be.kind_of(Class)
-    (klass < A2A::Schema::Definition).should == true
+    (klass < A2A::Protocol::JsonSchema::Definition).should == true
   end
 
   it "caches definition classes" do
@@ -376,7 +378,7 @@ describe "A2A::Schema" do
 
   it "valid! raises ValidationError for invalid data" do
     caps = schema["Agent Capabilities"].new(streaming: "not_a_bool")
-    lambda { caps.valid! }.should.raise(A2A::Schema::ValidationError)
+    lambda { caps.valid! }.should.raise(A2A::Protocol::JsonSchema::ValidationError)
   end
 
   it "detects additionalProperties violations" do
@@ -472,7 +474,7 @@ describe "A2A::Schema" do
     schema.list_definitions.each do |name|
       klass = schema[name]
       instance = klass.new
-      instance.is_a?(A2A::Schema::Definition).should == true
+      instance.is_a?(A2A::Protocol::JsonSchema::Definition).should == true
     end
   end
 
@@ -487,11 +489,11 @@ describe "A2A::Schema" do
         }
       }
     )
-    response.task.should.be.kind_of(A2A::Schema::Definition)
+    response.task.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     response.task.id.should == "task-123"
     response.task.context_id.should == "ctx-456"
     # Deeply nested: Task.status is also auto-wrapped
-    response.task.status.should.be.kind_of(A2A::Schema::Definition)
+    response.task.status.should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     response.task.status.state.should == "TASK_STATE_SUBMITTED"
   end
 
@@ -506,7 +508,7 @@ describe "A2A::Schema" do
     )
     task.history.should.be.kind_of(Array)
     task.history.length.should == 2
-    task.history[0].should.be.kind_of(A2A::Schema::Definition)
+    task.history[0].should.be.kind_of(A2A::Protocol::JsonSchema::Definition)
     task.history[0].role.should == "ROLE_USER"
     task.history[1].role.should == "ROLE_AGENT"
   end

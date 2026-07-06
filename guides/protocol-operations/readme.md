@@ -23,7 +23,7 @@ All 11 A2A operations are derived from the proto definition:
 ## Inspecting Operations
 
 ```ruby
-A2A::Proto.operations.each do |op|
+A2A::Protocol::Protobuf.operations.each do |op|
   puts "#{op.name}: #{op.rest_verb.upcase} #{op.rest_path}"
   puts "  request:  #{op.request_type}"
   puts "  response: #{op.response_type}"

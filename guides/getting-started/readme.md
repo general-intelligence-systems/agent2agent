@@ -33,7 +33,7 @@ agent = A2A::Agent.new do
     store.complete(id, nil)
     task = store.get(id)
 
-    respond A2A::Schema["Send Message Response"].new(
+    respond A2A::Protocol::JsonSchema["Send Message Response"].new(
       task: {
         "id"        => task[:id],
         "contextId" => task[:context_id],

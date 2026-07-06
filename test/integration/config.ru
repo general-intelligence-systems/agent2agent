@@ -2,8 +2,8 @@
 
 require "bundler/setup"
 require "a2a"
-require "a2a/sse"
-require "a2a/middleware"
+require "a2a/server/sse"
+require "a2a/server/middleware"
 require "console"
 require "securerandom"
 require "yaml"
@@ -29,7 +29,7 @@ agent = A2A::Agent.new do
 
   # ── SendMessage ────────────────────────────────────────────────────
   on "SendMessage" do
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::ExtractMessage
     respond_with ->(env) {
       request = env["a2a.request"]
       msg     = request.message
@@ -60,14 +60,14 @@ agent = A2A::Agent.new do
 
       TASKS[task_id] = task
 
-      A2A::Schema["Send Message Response"].new(task: task)
+      A2A::Protocol::JsonSchema["Send Message Response"].new(task: task)
     }
   end
 
   # ── SendStreamingMessage ───────────────────────────────────────────
   on "SendStreamingMessage" do
-    use A2A::Middleware::SSEStream
-    use A2A::Middleware::ExtractMessage
+    use A2A::Server::Middleware::SSEStream
+    use A2A::Server::Middleware::ExtractMessage
     respond_with ->(env) {
       request = env["a2a.request"]
       msg     = request.message
@@ -130,7 +130,7 @@ agent = A2A::Agent.new do
       task = TASKS[id]
       raise A2A::TaskNotFoundError.new(id) unless task
 
-      A2A::Schema["Task"].new(task)
+      A2A::Protocol::JsonSchema["Task"].new(task)
     }
   end
 
@@ -144,7 +144,7 @@ agent = A2A::Agent.new do
       tasks = TASKS.values
       tasks = tasks.select { |t| t["contextId"] == context_id } if context_id
 
-      A2A::Schema["List Tasks Response"].new(
+      A2A::Protocol::JsonSchema["List Tasks Response"].new(
         tasks: tasks,
       )
     }
@@ -161,13 +161,13 @@ agent = A2A::Agent.new do
 
       task["status"] = { "state" => "TASK_STATE_CANCELED", "timestamp" => now_ts.() }
 
-      A2A::Schema["Task"].new(task)
+      A2A::Protocol::JsonSchema["Task"].new(task)
     }
   end
 
   # ── SubscribeToTask ────────────────────────────────────────────────
   on "SubscribeToTask" do
-    use A2A::Middleware::SSEStream
+    use A2A::Server::Middleware::SSEStream
     respond_with ->(env) {
       request = env["a2a.request"]
       id = request.id
@@ -203,7 +203,7 @@ agent = A2A::Agent.new do
       PUSH_CONFIGS[task_id] ||= {}
       PUSH_CONFIGS[task_id][config_id] = config
 
-      A2A::Schema["Task Push Notification Config"].new(config)
+      A2A::Protocol::JsonSchema["Task Push Notification Config"].new(config)
     }
   end
 
@@ -218,7 +218,7 @@ agent = A2A::Agent.new do
       config = PUSH_CONFIGS.dig(task_id, config_id)
       raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
-      A2A::Schema["Task Push Notification Config"].new(config)
+      A2A::Protocol::JsonSchema["Task Push Notification Config"].new(config)
     }
   end
 
@@ -231,7 +231,7 @@ agent = A2A::Agent.new do
 
       configs = (PUSH_CONFIGS[task_id] || {}).values
 
-      A2A::Schema["List Task Push Notification Configs Response"].new(
+      A2A::Protocol::JsonSchema["List Task Push Notification Configs Response"].new(
         configs: configs,
       )
     }

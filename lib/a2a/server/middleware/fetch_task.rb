@@ -4,90 +4,92 @@ require "bundler/setup"
 require "a2a"
 
 module A2A
-  module Middleware
-    # Loads a task from the store and places it on `env["a2a.task"]`.
-    # Sets `env["a2a.task"]` to nil when the ID is absent or the task
-    # does not exist. Does not raise.
-    #
-    # The task ID is read from the request — by default from `request.id`.
-    # Use `id_field:` to read from a different field, and `from:` to
-    # read from a nested object on the request.
-    #
-    # Usage:
-    #
-    #   on "SendMessage" do
-    #     use A2A::Middleware::FetchTask, store: sqlite_store, id_field: :task_id, from: :message
-    #     respond_with -> (env) {
-    #       existing = env["a2a.task"]  # nil if new task
-    #     }
-    #   end
-    #
-    class FetchTask
-      def initialize(app, store:, id_field: :id, from: nil)
-        @app      = app
-        @store    = store
-        @id_field = id_field
-        @from     = from
+  class Server
+    module Middleware
+      # Loads a task from the store and places it on `env["a2a.task"]`.
+      # Sets `env["a2a.task"]` to nil when the ID is absent or the task
+      # does not exist. Does not raise.
+      #
+      # The task ID is read from the request — by default from `request.id`.
+      # Use `id_field:` to read from a different field, and `from:` to
+      # read from a nested object on the request.
+      #
+      # Usage:
+      #
+      #   on "SendMessage" do
+      #     use A2A::Server::Middleware::FetchTask, store: sqlite_store, id_field: :task_id, from: :message
+      #     respond_with -> (env) {
+      #       existing = env["a2a.task"]  # nil if new task
+      #     }
+      #   end
+      #
+      class FetchTask
+        def initialize(app, store:, id_field: :id, from: nil)
+          @app      = app
+          @store    = store
+          @id_field = id_field
+          @from     = from
+        end
+
+        def call(env)
+          request = env["a2a.request"]
+          source  = @from ? request.public_send(@from) : request
+          id      = source.public_send(@id_field)
+
+          env["a2a.task"] = id.to_s.empty? ? nil : @store.get(id)
+
+          @app.call(env)
+        end
       end
 
-      def call(env)
-        request = env["a2a.request"]
-        source  = @from ? request.public_send(@from) : request
-        id      = source.public_send(@id_field)
+      # Loads a task from the store and places it on `env["a2a.task"]`.
+      # Raises `A2A::TaskNotFoundError` if the task does not exist.
+      #
+      # The task ID is read from the request — by default from `request.id`.
+      # Use `id_field:` to read from a different field, and `from:` to
+      # read from a nested object on the request.
+      #
+      # Usage:
+      #
+      #   on "GetTask" do
+      #     use A2A::Server::Middleware::FetchTaskOrRaise, store: sqlite_store
+      #     respond_with -> (env) {
+      #       task = env["a2a.task"]
+      #     }
+      #   end
+      #
+      #   on "GetTaskPushNotificationConfig" do
+      #     use A2A::Server::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
+      #     respond_with -> (env) { ... }
+      #   end
+      #
+      class FetchTaskOrRaise
+        def initialize(app, store:, id_field: :id, from: nil)
+          @app      = app
+          @store    = store
+          @id_field = id_field
+          @from     = from
+        end
 
-        env["a2a.task"] = id.to_s.empty? ? nil : @store.get(id)
+        def call(env)
+          request = env["a2a.request"]
+          source  = @from ? request.public_send(@from) : request
+          id      = source.public_send(@id_field)
 
-        @app.call(env)
+          task = @store.get(id)
+          raise A2A::TaskNotFoundError.new(id) unless task
+
+          env["a2a.task"] = task
+
+          @app.call(env)
+        end
       end
     end
-
-    # Loads a task from the store and places it on `env["a2a.task"]`.
-    # Raises `A2A::TaskNotFoundError` if the task does not exist.
-    #
-    # The task ID is read from the request — by default from `request.id`.
-    # Use `id_field:` to read from a different field, and `from:` to
-    # read from a nested object on the request.
-    #
-    # Usage:
-    #
-    #   on "GetTask" do
-    #     use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store
-    #     respond_with -> (env) {
-    #       task = env["a2a.task"]
-    #     }
-    #   end
-    #
-    #   on "GetTaskPushNotificationConfig" do
-    #     use A2A::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
-    #     respond_with -> (env) { ... }
-    #   end
-    #
-    class FetchTaskOrRaise
-      def initialize(app, store:, id_field: :id, from: nil)
-        @app      = app
-        @store    = store
-        @id_field = id_field
-        @from     = from
-      end
-
-      def call(env)
-        request = env["a2a.request"]
-        source  = @from ? request.public_send(@from) : request
-        id      = source.public_send(@id_field)
-
-        task = @store.get(id)
-        raise A2A::TaskNotFoundError.new(id) unless task
-
-        env["a2a.task"] = task
-
-        @app.call(env)
-      end
-    end
-  end
+end
 end
 
 __END__
-  describe "A2A::Middleware::FetchTask" do
+  describe "A2A::Server::Middleware::FetchTask" do
     before do
       @store = Object.new
     end
@@ -100,7 +102,7 @@ __END__
       request.define_singleton_method(:id) { "t-1" }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTask.new(downstream, store: @store)
+      mw = A2A::Server::Middleware::FetchTask.new(downstream, store: @store)
       env = { "a2a.request" => request }
 
       mw.call(env).should == task_data
@@ -113,7 +115,7 @@ __END__
       request.define_singleton_method(:id) { "missing" }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTask.new(downstream, store: @store)
+      mw = A2A::Server::Middleware::FetchTask.new(downstream, store: @store)
       env = { "a2a.request" => request }
 
       mw.call(env).should.be.nil
@@ -124,7 +126,7 @@ __END__
       request.define_singleton_method(:id) { "" }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTask.new(downstream, store: @store)
+      mw = A2A::Server::Middleware::FetchTask.new(downstream, store: @store)
       env = { "a2a.request" => request }
 
       mw.call(env).should.be.nil
@@ -138,7 +140,7 @@ __END__
       request.define_singleton_method(:message) { message }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTask.new(downstream, store: @store, id_field: :task_id, from: :message)
+      mw = A2A::Server::Middleware::FetchTask.new(downstream, store: @store, id_field: :task_id, from: :message)
       env = { "a2a.request" => request }
 
       mw.call(env).should.be.nil
@@ -155,14 +157,14 @@ __END__
       request.define_singleton_method(:message) { message }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTask.new(downstream, store: @store, id_field: :task_id, from: :message)
+      mw = A2A::Server::Middleware::FetchTask.new(downstream, store: @store, id_field: :task_id, from: :message)
       env = { "a2a.request" => request }
 
       mw.call(env).should == task_data
     end
   end
 
-  describe "A2A::Middleware::FetchTaskOrRaise" do
+  describe "A2A::Server::Middleware::FetchTaskOrRaise" do
     before do
       @store = Object.new
     end
@@ -175,7 +177,7 @@ __END__
       request.define_singleton_method(:id) { "t-1" }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTaskOrRaise.new(downstream, store: @store)
+      mw = A2A::Server::Middleware::FetchTaskOrRaise.new(downstream, store: @store)
       env = { "a2a.request" => request }
 
       mw.call(env).should == task_data
@@ -188,7 +190,7 @@ __END__
       request.define_singleton_method(:id) { "missing" }
 
       downstream = -> (env) { :should_not_reach }
-      mw = A2A::Middleware::FetchTaskOrRaise.new(downstream, store: @store)
+      mw = A2A::Server::Middleware::FetchTaskOrRaise.new(downstream, store: @store)
       env = { "a2a.request" => request }
 
       lambda { mw.call(env) }.should.raise(A2A::TaskNotFoundError)
@@ -202,7 +204,7 @@ __END__
       request.define_singleton_method(:task_id) { "t-2" }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTaskOrRaise.new(downstream, store: @store, id_field: :task_id)
+      mw = A2A::Server::Middleware::FetchTaskOrRaise.new(downstream, store: @store, id_field: :task_id)
       env = { "a2a.request" => request }
 
       mw.call(env).should == task_data
@@ -219,7 +221,7 @@ __END__
       request.define_singleton_method(:message) { message }
 
       downstream = -> (env) { env["a2a.task"] }
-      mw = A2A::Middleware::FetchTaskOrRaise.new(downstream, store: @store, id_field: :task_id, from: :message)
+      mw = A2A::Server::Middleware::FetchTaskOrRaise.new(downstream, store: @store, id_field: :task_id, from: :message)
       env = { "a2a.request" => request }
 
       mw.call(env).should == task_data
