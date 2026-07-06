@@ -1,3 +1,17 @@
 #!/usr/bin/env bash
 
-bundle exec scampi
+debug=false
+args=()
+for arg in "$@"; do
+  if [[ "$arg" == "--debug" ]]; then
+    debug=true
+  else
+    args+=("$arg")
+  fi
+done
+
+if $debug; then
+  bundle exec scampi "${args[@]}"
+else
+  bundle exec scampi "${args[@]}" 2>/dev/null
+fi
