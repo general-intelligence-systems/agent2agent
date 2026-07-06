@@ -25,7 +25,7 @@ LOCK  = Async::Semaphore.new(1)
 
 # --- Agent ---
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card) do |env|
   case env["a2a.operation"]
 
   # -- SendMessage ---
@@ -195,4 +195,4 @@ end
 Console.info(self) { "Webhook Worker starting..." }
 Console.info(self) { "Push notifications example: async processing + webhook delivery" }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent)
+run agent

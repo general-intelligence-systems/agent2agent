@@ -93,7 +93,7 @@ __END__
 describe "A2A::Server::Bindings::REST" do
   require "a2a/test_helpers"
 
-  server = A2A::Server.new(agent_card: { "name" => "Test" }, agent: A2A::TestHelpers.stub_agent)
+  server = A2A::TestHelpers.stub_agent(agent_card: { "name" => "Test" })
   rack = Rack::MockRequest.new(server)
 
   A2A::Protocol::Protobuf.operations.each do |op|

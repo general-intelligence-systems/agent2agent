@@ -36,7 +36,7 @@ CODE_FILES = {
 TASKS = {}
 LOCK  = Async::Semaphore.new(1)
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card) do |env|
   case env["a2a.operation"]
 
   # Streams multiple code files as separate artifacts, each in chunks.
@@ -202,4 +202,4 @@ end
 Console.info(self) { "Code Generator starting..." }
 Console.info(self) { "Streaming artifacts example: chunked files with append/lastChunk" }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent)
+run agent

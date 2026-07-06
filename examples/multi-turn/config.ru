@@ -14,7 +14,7 @@ LOCK  = Async::Semaphore.new(1)
 NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 TERMINAL_STATES = %w[TASK_STATE_COMPLETED TASK_STATE_CANCELLED TASK_STATE_FAILED].freeze
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card, history_length: 20) do |env|
   case env["a2a.operation"]
 
   # -- SendMessage ---
@@ -181,4 +181,4 @@ end
 Console.info(self) { "Research Planner starting..." }
 Console.info(self) { "Multi-turn example: INPUT_REQUIRED -> confirmation -> COMPLETED" }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent, history_length: 20)
+run agent

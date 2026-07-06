@@ -24,7 +24,7 @@ now_ts = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 # ─── Agent ────────────────────────────────────────────────────────────
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card) do |env|
   case env["a2a.operation"]
 
   # ── SendMessage ────────────────────────────────────────────────────
@@ -226,4 +226,4 @@ end
 
 Console.info(self) { "Integration Test Agent starting..." }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent)
+run agent

@@ -16,7 +16,7 @@ LOCK  = Async::Semaphore.new(1)
 NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 TERMINAL_STATES = %w[TASK_STATE_COMPLETED TASK_STATE_CANCELLED TASK_STATE_FAILED].freeze
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card, history_length: 20, page_size: 50) do |env|
   case env["a2a.operation"]
   in "SendMessage"
     request    = env["a2a.request"]
@@ -231,4 +231,4 @@ Console.info(self) { "Store: in-memory (Async::Semaphore)" }
 Console.info(self) { "Streaming: Falcon-native SSE via Protocol::HTTP::Body::Writable" }
 Console.info(self) { "Concurrency: Async fibers (no threads)" }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent, history_length: 20, page_size: 50)
+run agent

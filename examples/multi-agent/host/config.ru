@@ -35,7 +35,7 @@ TASKS = {}
 LOCK  = Async::Semaphore.new(1)
 NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card) do |env|
   case env["a2a.operation"]
   in "SendMessage"
     request = env["a2a.request"]
@@ -203,4 +203,4 @@ end
 Console.info(self) { "Host Orchestrator starting on :9294..." }
 Console.info(self) { "Remote agents: #{REMOTE_AGENTS.map { |k,v| "#{k}=#{v}" }.join(", ")}" }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent)
+run agent

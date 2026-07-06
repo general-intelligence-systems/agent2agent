@@ -32,7 +32,7 @@ NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
 
 # --- A2A Agent ---
 
-agent = A2A.agent do |env|
+agent = A2A.agent(agent_card: agent_card) do |env|
   case env["a2a.operation"]
   in "SendMessage"
     request = env["a2a.request"]
@@ -88,4 +88,4 @@ end
 
 Console.info(self) { "Translator Agent starting on :9293..." }
 
-run A2A::Server.new(agent_card: agent_card, agent: agent)
+run agent

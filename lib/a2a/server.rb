@@ -25,7 +25,9 @@ module A2A
   #   LimitPaginationSize → sets env["a2a.page_size"]
   #   Agent               → the terminal app (your block)
   #
-  # Usage:
+  # The block is the terminal rack app — it is executed at the end of
+  # the stack, wrapped in the A2A::Agent error boundary. Usage
+  # (A2A.agent is a shorthand for this):
   #
   #   app = A2A::Server.new(agent_card: { "name" => "My Agent", ... }) do |env|
   #     case env["a2a.operation"]
@@ -36,17 +38,12 @@ module A2A
   #
   #   run app
   #
-  # A prebuilt agent (or any rack-shaped app) can be passed instead of
-  # a block:
-  #
-  #   app = A2A::Server.new(agent_card: card, agent: agent)
-  #
   class Server
-    def initialize(agent_card: {}, agent: nil, history_length: 100, page_size: 100, &block)
-      raise ArgumentError, "Server requires an agent or a block" unless agent || block
+    def initialize(agent_card: {}, history_length: 100, page_size: 100, &block)
+      raise ArgumentError, "Server requires a block" unless block
 
       @agent_card     = agent_card
-      @agent          = agent || A2A.agent(&block)
+      @agent          = Agent.new(&block)
       @history_length = history_length
       @page_size      = page_size
       @app            = build_app
