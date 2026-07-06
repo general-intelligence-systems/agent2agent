@@ -9,7 +9,7 @@ Demonstrates the `INPUT_REQUIRED` state for multi-turn interactions where the ag
 - Task state transitions: `SUBMITTED` -> `WORKING` -> `INPUT_REQUIRED` -> `COMPLETED`
 - Multi-turn conversation flow using `taskId` to continue a task
 - Confirmation-gated processing (agent asks, user confirms)
-- SQLite-backed persistent task store
+- In-memory task store guarded by `Async::Semaphore`
 
 ## Step 1: Start the agent
 
@@ -182,6 +182,7 @@ docker compose down
 | File | Purpose |
 |---|---|
 | `config.ru` | Agent logic -- SendMessage (new task + continuation), GetTask |
+| `agent_card.yml` | Agent card definition |
 | `falcon.rb` | Falcon server config (binds to port 9292) |
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |

@@ -2,38 +2,37 @@
 layout: default
 title: Push Notifications
 nav_order: 4
-description: Demonstrates asynchronous task processing with webhook-based push notification
-  delivery for status and artifact updates.
+description: Demonstrates asynchronous task processing with push notification config
+  management (inline and CRUD) plus a webhook receiver service.
 ---
 
 # Push Notifications
 
-Demonstrates asynchronous task processing with webhook-based push notification delivery for status and artifact updates.
+Demonstrates asynchronous task processing with push notification config management — inline via `SendMessage` and through the full config CRUD operations — alongside a webhook receiver service.
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/push-notifications)
 
 ## What you'll learn
 
-- Async background processing with `A2A::Store::Processor`
-- Push notification config (inline via `SendMessage` and CRUD operations)
-- Webhook delivery on state transitions and artifact creation
-- Two-service setup: agent + webhook receiver
+- Async background processing with an `Async` fiber (immediate `SUBMITTED` response)
+- Accepting an inline push notification config via `SendMessage`'s `configuration`
 - Full push notification config CRUD: Create, Get, List, Delete
+- Two-service setup: agent + webhook receiver
 
 ## Architecture
 
 | Service | Port | Role |
 |---|---|---|
-| **agent** | 9292 | Processes jobs asynchronously, delivers webhook updates |
-| **receiver** | 9293 | Minimal Rack app that logs incoming webhook payloads |
+| **agent** | 9292 | Processes jobs asynchronously, stores push notification configs per task |
+| **receiver** | 9293 | Minimal Rack app that logs webhook POSTs to `/webhook` (with `X-A2A-Notification-Token` support) |
 
-The agent always returns immediately with `SUBMITTED` state. Work runs in a background fiber, and each state transition triggers webhook delivery to registered push notification configs. The receiver logs all incoming webhooks to stdout.
+The agent always returns immediately with `SUBMITTED` state; work runs in a background fiber. Push notification configs are stored per task — both inline configs from `SendMessage` and configs registered via the CRUD operations. The receiver is a ready-made target that logs any webhook payload POSTed to it; actually delivering webhooks on state transitions is application code (the library provides the config operations, not a delivery mechanism).
 
 ## Step 1: Start both services
 
 ```bash
-git clone https://github.com/general-intelligence-systems/a2a.git
-cd a2a/examples/push-notifications
+git clone https://github.com/general-intelligence-systems/agent2agent.git
+cd agent2agent/examples/push-notifications
 docker compose up -d --build
 ```
 
@@ -65,7 +64,7 @@ agent-1     |   0.0s     info: main [pid=1] [2025-05-01 12:00:00 +0000]
 agent-1     |                | Push notifications example: async processing + webhook delivery
 ```
 
-Both services should be running. The receiver is waiting for webhook POSTs on port 9293.
+Both services should be running. The receiver waits for webhook POSTs on port 9293.
 
 ## Step 3: Submit a job with an inline push notification config
 
@@ -100,77 +99,11 @@ Expected output:
 }
 ```
 
-The response returns immediately with `TASK_STATE_SUBMITTED`. The work is now running in a background fiber. **Copy the `task.id` value** for later steps.
+The response returns immediately with `TASK_STATE_SUBMITTED` — the handler stored the inline config, spawned an `Async` fiber, and responded without waiting. The work is now running in the background. **Copy the `task.id` value** for later steps.
 
-## Step 4: Watch the receiver logs for webhook deliveries
+## Step 4: Poll for the final result
 
-Wait 2-3 seconds for the background work to complete, then check the receiver logs:
-
-```bash
-docker compose logs receiver
-```
-
-Expected output:
-
-```
-receiver-1  |   1.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:02 +0000]
-receiver-1  |                | Webhook received!
-receiver-1  |   1.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:02 +0000]
-receiver-1  |                |   Token: my-secret-token
-receiver-1  |   1.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:02 +0000]
-receiver-1  |                |   Payload: {
-receiver-1  |                |     "taskId": "be85b851-...",
-receiver-1  |                |     "status": {
-receiver-1  |                |       "state": "TASK_STATE_WORKING",
-receiver-1  |                |       "timestamp": "2025-05-01T12:00:02.000Z",
-receiver-1  |                |       "message": {
-receiver-1  |                |         "messageId": "...",
-receiver-1  |                |         "role": "ROLE_AGENT",
-receiver-1  |                |         "parts": [{"text": "Starting work on: Process this data"}]
-receiver-1  |                |       }
-receiver-1  |                |     }
-receiver-1  |                |   }
-receiver-1  |   2.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:03 +0000]
-receiver-1  |                | Webhook received!
-receiver-1  |   2.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:03 +0000]
-receiver-1  |                |   Token: my-secret-token
-receiver-1  |   2.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:03 +0000]
-receiver-1  |                |   Payload: {
-receiver-1  |                |     "taskId": "be85b851-...",
-receiver-1  |                |     "status": {
-receiver-1  |                |       "state": "TASK_STATE_WORKING",
-receiver-1  |                |       "timestamp": "2025-05-01T12:00:03.000Z",
-receiver-1  |                |       "message": {
-receiver-1  |                |         "messageId": "...",
-receiver-1  |                |         "role": "ROLE_AGENT",
-receiver-1  |                |         "parts": [{"text": "Processing... 50% complete"}]
-receiver-1  |                |       }
-receiver-1  |                |     }
-receiver-1  |                |   }
-receiver-1  |   3.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:04 +0000]
-receiver-1  |                | Webhook received!
-receiver-1  |   3.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:04 +0000]
-receiver-1  |                |   Token: my-secret-token
-receiver-1  |   3.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:04 +0000]
-receiver-1  |                |   Payload: {
-receiver-1  |                |     "taskId": "be85b851-...",
-receiver-1  |                |     "status": {
-receiver-1  |                |       "state": "TASK_STATE_COMPLETED",
-receiver-1  |                |       "timestamp": "2025-05-01T12:00:04.000Z"
-receiver-1  |                |     }
-receiver-1  |                |   }
-```
-
-You should see 3 webhook deliveries:
-1. `TASK_STATE_WORKING` -- "Starting work on: Process this data"
-2. `TASK_STATE_WORKING` -- "Processing... 50% complete"
-3. `TASK_STATE_COMPLETED` -- work is done
-
-Each webhook includes the `token` you provided (`my-secret-token`) in the `X-A2A-Notification-Token` header.
-
-## Step 5: Poll for the final result
-
-Replace `TASK_ID_HERE` with the `id` from Step 3:
+The background fiber transitions the task `SUBMITTED` → `WORKING` → `COMPLETED` over about 2 seconds. Wait a moment, then poll. Replace `TASK_ID_HERE` with the `id` from Step 3:
 
 ```bash
 curl -s -X POST http://localhost:9292/ \
@@ -212,7 +145,9 @@ Expected output:
 }
 ```
 
-## Step 6: Push notification config CRUD
+If you poll quickly enough you'll catch the task in `TASK_STATE_WORKING` with a partial history.
+
+## Step 5: Push notification config CRUD
 
 The agent supports the full push notification config lifecycle. These operations use the `TASK_ID_HERE` from Step 3.
 
@@ -281,7 +216,7 @@ curl -s -X POST http://localhost:9292/ \
   }}' | jq .
 ```
 
-Expected output:
+Expected output (the inline config from Step 3 plus the one created above):
 
 ```json
 {
@@ -290,7 +225,6 @@ Expected output:
   "result": {
     "configs": [
       {
-        "id": "cfg-0000-...",
         "url": "http://receiver:9293/webhook",
         "token": "my-secret-token"
       },
@@ -326,6 +260,32 @@ Expected output:
 }
 ```
 
+## Step 6: Try the receiver
+
+The receiver logs any webhook POST it gets — the same shape your agent would send when wiring up delivery:
+
+```bash
+curl -s -X POST http://localhost:9293/webhook \
+  -H "Content-Type: application/json" \
+  -H "X-A2A-Notification-Token: my-secret-token" \
+  -d '{"taskId":"be85b851-...","status":{"state":"TASK_STATE_COMPLETED"}}'
+```
+
+```bash
+docker compose logs receiver
+```
+
+```
+receiver-1  |   5.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:06 +0000]
+receiver-1  |                | Webhook received!
+receiver-1  |   5.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:06 +0000]
+receiver-1  |                |   Token: my-secret-token
+receiver-1  |   5.0s     info: WebhookReceiver [pid=1] [2025-05-01 12:00:06 +0000]
+receiver-1  |                |   Payload: { ... }
+```
+
+To deliver notifications from your own agent, POST the task status to each stored config's `url` (setting the config's `token` as the `X-A2A-Notification-Token` header) whenever the background fiber transitions state.
+
 ## Step 7: Cleanup
 
 ```bash
@@ -336,7 +296,7 @@ docker compose down
 
 | File | Purpose |
 |---|---|
-| `agent/config.ru` | Agent -- async processing, push notification config CRUD, webhook delivery |
+| `agent/config.ru` | Agent -- async processing, push notification config CRUD |
 | `agent/falcon.rb` | Falcon config for agent (port 9292) |
 | `agent/Gemfile` | Agent dependencies |
 | `agent/Dockerfile` | Container build for the agent service |
@@ -346,4 +306,4 @@ docker compose down
 | `receiver/Dockerfile` | Container build for the receiver service |
 | `docker-compose.yml` | Two-service compose config |
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/push-notifications)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/push-notifications)

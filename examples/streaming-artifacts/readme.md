@@ -153,6 +153,7 @@ docker compose down
 | File | Purpose |
 |---|---|
 | `config.ru` | Agent logic -- SendStreamingMessage (chunked), SendMessage (fallback), GetTask |
+| `agent_card.yml` | Agent card definition |
 | `falcon.rb` | Falcon server config (binds to port 9292) |
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |

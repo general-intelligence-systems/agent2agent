@@ -19,7 +19,8 @@ module A2A
             operation = env.request.context&.dig(:a2a_operation)
             return unless operation
 
-            env.url.path = "/"
+            # POST to the server's mount root — env.url already carries the
+            # base path (e.g. "/agent1" when mounted at a subpath).
             env.method = :post
 
             env.body = {

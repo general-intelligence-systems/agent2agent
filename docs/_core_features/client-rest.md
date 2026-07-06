@@ -49,7 +49,8 @@ Content-Type: application/a2a+json
 ```ruby
 client.send_streaming_message(
   message: { "messageId" => "msg-1", "role" => "ROLE_USER", "parts" => [{ "text" => "Hello" }] }
-) do |chunk, env|
+) do |event|
+  # each SSE event parsed into a "Stream Response" schema object
 end
 ```
 
@@ -102,7 +103,7 @@ Content-Type: application/a2a+json
 ## subscribe_to_task
 
 ```ruby
-client.subscribe_to_task(id: "task-123") do |chunk, env|
+client.subscribe_to_task(id: "task-123") do |event|
 end
 ```
 

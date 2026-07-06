@@ -19,7 +19,7 @@ Three A2A agents communicating via the protocol: an LLM-powered orchestrator dis
 | **translator** | 9293 | LLM-powered language translator |
 | **host** | 9294 | Orchestrator -- discovers agents, routes requests via LLM |
 
-The **host** agent discovers the greeter and translator agent cards at startup, then uses an LLM to decide which agent should handle each incoming request. It delegates via `A2A::Client.send_message` and returns the remote agent's response.
+The **host** agent discovers the greeter and translator agent cards lazily on first request, then uses an LLM to decide which agent should handle each incoming request. It delegates via `A2A::Client#send_message` and returns the remote agent's response.
 
 ## Prerequisites
 
@@ -144,11 +144,11 @@ docker compose logs host
 You should see:
 
 ```
-host-1  |   1.0s     info: A2A::Agent [pid=1] [2025-05-01 12:00:01 +0000]
+host-1  |   1.0s     info: main [pid=1] [2025-05-01 12:00:01 +0000]
 host-1  |                | Discovered agent: Greeter Agent at http://greeter:9292
-host-1  |   1.0s     info: A2A::Agent [pid=1] [2025-05-01 12:00:01 +0000]
+host-1  |   1.0s     info: main [pid=1] [2025-05-01 12:00:01 +0000]
 host-1  |                | Discovered agent: Translator Agent at http://translator:9293
-host-1  |   1.5s     info: A2A::Agent [pid=1] [2025-05-01 12:00:01 +0000]
+host-1  |   1.5s     info: main [pid=1] [2025-05-01 12:00:01 +0000]
 host-1  |                | Routing to 'greeter' for: Greet Alice for her birthday
 ```
 
@@ -223,6 +223,7 @@ docker compose down
 | `greeter/config.ru` | Greeter agent -- generates creative greetings via Brute |
 | `translator/config.ru` | Translator agent -- translates text via Brute |
 | `host/config.ru` | Host orchestrator -- discovers agents, routes via LLM |
+| `*/agent_card.yml` | Agent card definitions for each service |
 | `*/falcon.rb` | Falcon server configs for each service |
 | `*/Gemfile` | Per-service dependencies |
 | `*/Dockerfile` | Per-service container build |

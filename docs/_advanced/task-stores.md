@@ -1,53 +1,88 @@
 ---
 layout: default
-title: Task Stores
+title: Managing Task State
 nav_order: 2
-description: This guide covers the in-memory and SQLite task stores and their shared
-  interface.
+description: This guide covers managing task state in your agent — the gem ships no
+  built-in task store, so persistence is your application's concern.
 ---
 
-# Task Stores
+# Managing Task State
 
-This guide covers the in-memory and SQLite task stores and their shared interface.
+The gem ships **no built-in task store**. The handler block is plain Ruby: how tasks are created, updated, and persisted is entirely your application's concern. This keeps the library small and lets you use whatever fits — an in-memory hash for demos, your existing database for production.
 
 ## In-Memory (development)
 
-```ruby
-store = A2A::TaskStore.new
-server = A2A::Server.new(agent_card: card, store: store)
-```
-
-## SQLite (production)
+The runnable examples use a plain hash guarded by an `Async::Semaphore`. Falcon serves requests on fibers, so a semaphore is enough to keep multi-step mutations atomic — no threads, no mutex:
 
 ```ruby
-require "a2a/store"
+require "async/semaphore"
 
-store = A2A::Store::SQLite.new(path: "agent.db")
-server = A2A::Server.new(agent_card: card, store: store)
+TASKS = {}
+LOCK  = Async::Semaphore.new(1)
+NOW   = -> { Time.now.utc.strftime("%Y-%m-%dT%H:%M:%S.%3NZ") }
+TERMINAL_STATES = %w[TASK_STATE_COMPLETED TASK_STATE_CANCELLED TASK_STATE_FAILED].freeze
+
+run A2A.agent(agent_card: agent_card) do |env|
+  case env["a2a.operation"]
+  in "SendMessage"
+    task_id = SecureRandom.uuid
+
+    LOCK.acquire do
+      TASKS[task_id] = {
+        id: task_id, context_id: SecureRandom.uuid,
+        state: "TASK_STATE_SUBMITTED", updated_at: NOW.(),
+        artifacts: [], history: [],
+      }
+    end
+
+    # ... do the work, then build the response from the stored task ...
+
+  in "GetTask"
+    id    = env["a2a.request"].id
+    limit = env["a2a.history_length"]
+
+    task = LOCK.acquire { TASKS[id] }
+    raise A2A::TaskNotFoundError.new(id) unless task
+
+    A2A::Protocol::JsonSchema["Task"].new(
+      id:         task[:id],
+      context_id: task[:context_id],
+      status:     { state: task[:state], timestamp: task[:updated_at] },
+      artifacts:  task[:artifacts],
+      history:    task[:history]&.last(limit),
+    )
+
+  in "CancelTask"
+    id   = env["a2a.request"].id
+    task = LOCK.acquire { TASKS[id] }
+    raise A2A::TaskNotFoundError.new(id) unless task
+    raise A2A::TaskNotCancelableError.new(id, state: task[:state]) if TERMINAL_STATES.include?(task[:state])
+
+    LOCK.acquire do
+      TASKS[id][:state] = "TASK_STATE_CANCELLED"
+      TASKS[id][:updated_at] = NOW.()
+    end
+    # ... return the Task ...
+  end
+end
 ```
 
-## Store Interface
+Note how the middleware-provided limits plug in: `env["a2a.history_length"]` caps the history you return, and `env["a2a.page_size"]` drives `ListTasks` pagination. See the [full example]({% link _examples/examples-full.md %}) for a complete implementation including `ListTasks` with pagination.
 
-Both stores share the same interface:
+## Your Own Database (production)
+
+For durable state, back the handler with your own models. Because the handler is just a block, this is ordinary application code:
 
 ```ruby
-store.create(task_id, context_id)
-store.get(task_id)                              # => Hash or nil
-store.update_state(task_id, "TASK_STATE_WORKING", message: { ... })
-store.add_artifact(task_id, { "artifactId" => "...", "parts" => [...] })
-store.add_message(task_id, { "role" => "ROLE_AGENT", "parts" => [...] })
-store.complete(task_id, result)
-store.fail(task_id, "something went wrong")
-store.cancel(task_id)
-store.list(context_id: "ctx-1", state: "TASK_STATE_COMPLETED")
+run A2A.agent(agent_card: agent_card) do |env|
+  case env["a2a.operation"]
+  in "GetTask"
+    task = Task.find_by(id: env["a2a.request"].id)
+    raise A2A::TaskNotFoundError.new(env["a2a.request"].id) unless task
 
-# Pub/sub (for SubscribeToTask)
-queue = store.subscribe(task_id)
-store.unsubscribe(task_id, queue)
-
-# Push notification configs
-store.create_push_config(task_id, config)
-store.get_push_config(task_id, config_id)
-store.list_push_configs(task_id)
-store.delete_push_config(task_id, config_id)
+    task.to_a2a  # your method that builds A2A::Protocol::JsonSchema["Task"]
+  end
+end
 ```
+
+Whatever the backend, the contract is the same: return a `Schema::Definition` (build it with `A2A::Protocol::JsonSchema[...]`) and raise `A2A::Error` subclasses like `A2A::TaskNotFoundError` when lookups fail.

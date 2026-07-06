@@ -20,9 +20,14 @@ Requires Ruby >= 3.2.
 
 ## Minimal Agent
 
+`A2A.agent` builds a complete A2A server (a Rack app) from a single handler block. The block receives the Rack env and routes operations with pattern matching. It returns a schema object (`A2A::Protocol::JsonSchema::Definition`) — the binding layer formats it into HTTP.
+
 ```ruby
 # config.ru
 require "a2a"
+require "securerandom"
+
+TASKS = {}
 
 agent_card = {
   "name"    => "Echo Agent",
@@ -30,45 +35,47 @@ agent_card = {
   "version" => "1.0.0",
 }
 
-agent = A2A::Agent.new do
-  on "SendMessage" do |request|
-    text = request.message.parts.first.text
-    store.create(id = SecureRandom.uuid, SecureRandom.uuid)
-    store.add_artifact(id, {
-      "artifactId" => SecureRandom.uuid,
-      "parts"      => [{ "text" => "Echo: #{text}" }],
-    })
-    store.complete(id, nil)
-    task = store.get(id)
+run A2A.agent(agent_card: agent_card) do |env|
+  case env["a2a.operation"]
+  in "SendMessage"
+    text    = env["a2a.message"]  # extracted text of the message parts
+    task_id = SecureRandom.uuid
 
-    respond A2A::Protocol::JsonSchema["Send Message Response"].new(
-      task: {
-        "id"        => task[:id],
-        "contextId" => task[:context_id],
-        "status"    => { "state" => task[:state] },
-        "artifacts" => task[:artifacts],
-      }
-    )
+    TASKS[task_id] = {
+      "id"        => task_id,
+      "contextId" => SecureRandom.uuid,
+      "status"    => { "state" => "TASK_STATE_COMPLETED" },
+      "artifacts" => [{
+        "artifactId" => SecureRandom.uuid,
+        "parts"      => [{ "text" => "Echo: #{text}" }],
+      }],
+    }
+
+    A2A::Protocol::JsonSchema["Send Message Response"].new(task: TASKS[task_id])
+
+  in "GetTask"
+    id   = env["a2a.request"].id
+    task = TASKS[id] or raise A2A::TaskNotFoundError.new(id)
+
+    A2A::Protocol::JsonSchema["Task"].new(task)
   end
 end
-
-app = A2A::Server.new(agent_card: agent_card)
-app.register(agent)
-run app
 ```
+
+Any operation the `case` doesn't match falls out with `NoMatchingPatternError`, which the server converts to a spec-compliant `UnsupportedOperationError` (JSON-RPC code `-32004`). Raising an `A2A::Error` subclass (like `A2A::TaskNotFoundError` above) produces the corresponding protocol error response.
 
 ```bash
 bundle exec falcon serve --bind http://0.0.0.0:9292
 ```
 
-The server exposes three endpoint groups automatically:
+The server exposes these endpoint groups automatically:
 
 | Path | Purpose |
 |------|---------|
 | `/.well-known/agent-card.json` | Agent card discovery |
 | `/` | JSON-RPC 2.0 binding |
 | `/rest/*` | HTTP+JSON/REST binding |
-| `/grpc` | gRPC binding (reserved, not yet implemented) |
+| `/grpc` | gRPC binding (reserved — returns 501 Not Implemented) |
 
 ## Calling It
 
@@ -89,24 +96,29 @@ curl -X POST http://localhost:9292/rest/message:send \
 
 ## Client
 
+The client validates request params against the operation's schema before sending, and returns responses as schema objects (with snake_case readers):
+
 ```ruby
+require "a2a"
+
 Async do
   client = A2A::Client.new("http://localhost:9292")
 
   card = client.agent_card
-  # => {"name"=>"Echo Agent", ...}
+  card.name    # => "Echo Agent"
+  card.version # => "1.0.0"
 
   result = client.send_message(
     message: {
-      "messageId" => "msg-1",
-      "role"      => "ROLE_USER",
-      "parts"     => [{ "text" => "Hello" }],
+      message_id: "msg-1",
+      role:       "ROLE_USER",
+      parts:      [{ text: "Hello" }],
     }
   )
-  # => {"task"=>{"id"=>"...", "status"=>{"state"=>"TASK_STATE_COMPLETED"}, ...}}
+  result.task.status.state # => "TASK_STATE_COMPLETED"
 
-  task = client.get_task(id: result.dig("task", "id"))
+  task = client.get_task(id: result.task.id)
 end
 ```
 
-All 11 protocol operations are available as snake_case methods: `send_message`, `get_task`, `list_tasks`, `cancel_task`, `send_streaming_message`, `subscribe_to_task`, etc.
+All 11 protocol operations are available as snake_case methods: `send_message`, `get_task`, `list_tasks`, `cancel_task`, `send_streaming_message`, `subscribe_to_task`, etc. Pass `binding: :rest` to `A2A::Client.new` to use the REST binding instead of JSON-RPC.

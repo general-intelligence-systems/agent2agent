@@ -33,7 +33,7 @@ module A2A
     #
     # Returns an A2A::Protocol::JsonSchema["Agent Card"] instance.
     def agent_card
-      response = @conn.get("/.well-known/agent-card.json")
+      response = @conn.get(".well-known/agent-card.json")
       parsed = response.body
       A2A::Protocol::JsonSchema["Agent Card"].new(parsed)
     end
@@ -98,7 +98,7 @@ module A2A
         request = operation.request_schema.new(params)
         request.valid!
 
-        response = @conn.post("/") do |req|
+        response = @conn.post do |req|
           req.options.context = { a2a_operation: operation }
           req.body = request
         end
@@ -112,7 +112,7 @@ module A2A
 
         parser = A2A::Server::SSE::EventParser.new(binding: @binding)
 
-        @conn.post("/") do |req|
+        @conn.post do |req|
           req.options.context = { a2a_operation: operation }
           req.body = request
           req.headers["Accept"] = "text/event-stream"

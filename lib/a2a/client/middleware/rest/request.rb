@@ -28,7 +28,9 @@ module A2A
             path = interpolate_path(operation.rest_path, params)
             remaining = remove_path_params(operation.rest_path, params)
 
-            env.url.path = "/rest#{path}"
+            # Prefix /rest under the base path, so servers mounted at a
+            # subpath (e.g. "/agent1") keep working.
+            env.url.path = "#{env.url.path.chomp("/")}/rest#{path}"
             env.method = operation.rest_verb.to_sym
 
             if [:get, :delete].include?(env.method)

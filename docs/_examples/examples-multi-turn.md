@@ -10,20 +10,21 @@ description: Demonstrates the INPUT_REQUIRED state for multi-turn interactions w
 
 Demonstrates the `INPUT_REQUIRED` state for multi-turn interactions where the agent asks for user confirmation before proceeding.
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-turn)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/multi-turn)
 
 ## What you'll learn
 
 - Task state transitions: `SUBMITTED` -> `WORKING` -> `INPUT_REQUIRED` -> `COMPLETED`
 - Multi-turn conversation flow using `taskId` to continue a task
+- Pattern-matching on the request to distinguish new tasks from continuations
 - Confirmation-gated processing (agent asks, user confirms)
-- SQLite-backed persistent task store
+- In-memory task state guarded by `Async::Semaphore`
 
 ## Step 1: Start the agent
 
 ```bash
-git clone https://github.com/general-intelligence-systems/a2a.git
-cd a2a/examples/multi-turn
+git clone https://github.com/general-intelligence-systems/agent2agent.git
+cd agent2agent/examples/multi-turn
 docker compose up -d --build
 ```
 
@@ -195,4 +196,4 @@ docker compose down
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-turn)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/multi-turn)

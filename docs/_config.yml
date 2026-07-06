@@ -1,5 +1,5 @@
 title: agent2agent
-description: 'A Ruby implementation of the Agent-to-Agent (A2A) protocol. Build interoperable AI agents with JSON-RPC and REST bindings, SSE streaming, task stores, and push notifications.'
+description: 'A Ruby implementation of the Agent-to-Agent (A2A) protocol. Build interoperable AI agents with JSON-RPC and REST bindings, SSE streaming, and schema-validated protocol objects.'
 url: https://general-intelligence-systems.github.io
 baseurl: /agent2agent
 lang: en-US

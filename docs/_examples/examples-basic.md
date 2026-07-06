@@ -10,19 +10,19 @@ description: A minimal A2A agent that echoes messages back. The simplest startin
 
 A minimal A2A agent that echoes messages back. The simplest starting point for understanding the A2A protocol.
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/basic)
 
 ## What you'll learn
 
 - Agent card discovery via `/.well-known/agent-card.json`
 - `SendMessage` and `GetTask` operations
-- Basic `A2A::Server` and `A2A::Agent` setup with Rack
+- The minimal `A2A.agent` pattern-matching handler with Rack
 
 ## Step 1: Start the agent
 
 ```bash
-git clone https://github.com/general-intelligence-systems/a2a.git
-cd a2a/examples/basic
+git clone https://github.com/general-intelligence-systems/agent2agent.git
+cd agent2agent/examples/basic
 docker compose up -d --build
 ```
 
@@ -86,7 +86,7 @@ Expected output:
 }
 ```
 
-This is a bare-bones echo agent -- it returns an empty response object. See the [full example](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full) for a complete implementation with all 11 operations.
+This is a bare-bones echo agent -- it returns an empty response object. See the [full example](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/full) for a complete implementation with task state, streaming, pagination, and cancellation.
 
 ## Step 5: Cleanup
 
@@ -104,4 +104,4 @@ docker compose down
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/basic)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/basic)

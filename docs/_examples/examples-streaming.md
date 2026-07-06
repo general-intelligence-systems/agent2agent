@@ -10,7 +10,7 @@ description: Demonstrates chunked artifact streaming with append/lastChunk seman
 
 Demonstrates chunked artifact streaming with `append`/`lastChunk` semantics, streaming multiple files as separate artifacts over SSE.
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/streaming-artifacts)
 
 ## What you'll learn
 
@@ -24,8 +24,8 @@ Demonstrates chunked artifact streaming with `append`/`lastChunk` semantics, str
 ## Step 1: Start the agent
 
 ```bash
-git clone https://github.com/general-intelligence-systems/a2a.git
-cd a2a/examples/streaming-artifacts
+git clone https://github.com/general-intelligence-systems/agent2agent.git
+cd agent2agent/examples/streaming-artifacts
 docker compose up -d --build
 ```
 
@@ -166,4 +166,4 @@ docker compose down
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/streaming-artifacts)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/streaming-artifacts)

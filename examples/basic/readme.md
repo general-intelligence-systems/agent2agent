@@ -8,7 +8,7 @@ A minimal A2A agent that echoes messages back. The simplest starting point for u
 
 - Agent card discovery via `/.well-known/agent-card.json`
 - `SendMessage` and `GetTask` operations
-- Basic `A2A::Server` and `A2A::Agent` setup with Rack
+- The one-call `A2A.agent` entrypoint -- a handler block that routes operations with pattern matching and returns a complete Rack app
 
 ## Step 1: Start the agent
 
@@ -90,7 +90,8 @@ docker compose down
 
 | File | Purpose |
 |---|---|
-| `config.ru` | Rack entry point -- defines the agent card, handlers, and boots the server |
+| `config.ru` | Rack entry point -- builds the agent with `A2A.agent` and boots the server |
+| `agent_card.yml` | Agent card definition |
 | `falcon.rb` | Falcon server config (binds to port 9292) |
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |

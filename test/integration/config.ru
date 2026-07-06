@@ -190,7 +190,7 @@ agent = A2A.agent(agent_card: agent_card) do |env|
     raise A2A::TaskNotFoundError.new(task_id) unless TASKS[task_id]
 
     config = PUSH_CONFIGS.dig(task_id, config_id)
-    raise A2A::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
+    raise A2A::Internal::Errors::PushNotificationConfigNotFoundError.new(task_id, config_id) unless config
 
     A2A::Protocol::JsonSchema["Task Push Notification Config"].new(config)
 

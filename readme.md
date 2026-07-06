@@ -2,9 +2,26 @@
 
 A Ruby implementation of Google's [Agent-to-Agent (A2A) protocol](https://a2a-protocol.org/) -- an open standard for interoperable communication between AI agents.
 
-Build A2A-compliant agents that can communicate with any other A2A agent regardless of language or framework. Ships with server and client, both protocol bindings (JSON-RPC 2.0 and HTTP+JSON/REST), SSE streaming, SQLite persistence, and push notifications.
+Build A2A-compliant agents that can communicate with any other A2A agent regardless of language or framework. Ships with server and client, both protocol bindings (JSON-RPC 2.0 and HTTP+JSON/REST), and SSE streaming.
 
 Runs on [Falcon](https://github.com/socketry/falcon) + [Async](https://github.com/socketry/async) -- pure fiber-based concurrency, no threads.
+
+An agent is a single `A2A.agent` call: the block receives the Rack env and routes operations with pattern matching, and the return value is a complete Rack app. In `config.ru`:
+
+```ruby
+require "a2a"
+
+run A2A.agent(agent_card: { "name" => "Echo Agent", "url" => "http://localhost:9292", "version" => "1.0.0" }) do |env|
+  case env["a2a.operation"]
+  in "SendMessage"
+    A2A::Protocol::JsonSchema["Send Message Response"].new({})
+  in "GetTask"
+    A2A::Protocol::JsonSchema["Task"].new({})
+  end
+end
+```
+
+Operations the block doesn't match automatically return `UnsupportedOperationError`.
 
 ## Usage
 
@@ -16,15 +33,15 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 
   - [Client — REST Binding](https://general-intelligence-systems.github.io/agent2agent/client-rest/) - This guide covers all 11 protocol operations using the HTTP+JSON/REST binding of `A2A::Client`.
 
-  - [Agent DSL](https://general-intelligence-systems.github.io/agent2agent/agent-dsl/) - This guide covers the handler DSL for building agents.
+  - [Agent Handler](https://general-intelligence-systems.github.io/agent2agent/agent-dsl/) - This guide covers the pattern-matching handler block for building agents.
 
   - [Streaming](https://general-intelligence-systems.github.io/agent2agent/streaming/) - This guide covers SSE streaming for real-time task updates and chunked artifact delivery.
 
   - [Multi-Turn Conversations](https://general-intelligence-systems.github.io/agent2agent/multi-turn/) - This guide covers using `TASK_STATE_INPUT_REQUIRED` to build confirmation-gated and multi-step conversations.
 
-  - [Async Background Jobs](https://general-intelligence-systems.github.io/agent2agent/async-jobs/) - This guide covers non-blocking background work with `returnImmediately` and `Store::Processor`.
+  - [Async Background Jobs](https://general-intelligence-systems.github.io/agent2agent/async-jobs/) - This guide covers non-blocking background work with Async fibers and immediate SUBMITTED responses.
 
-  - [Task Stores](https://general-intelligence-systems.github.io/agent2agent/task-stores/) - This guide covers the in-memory and SQLite task stores and their shared interface.
+  - [Managing Task State](https://general-intelligence-systems.github.io/agent2agent/task-stores/) - This guide covers managing task state in your agent -- the gem ships no built-in task store, so persistence is your application's concern.
 
   - [Schema Validation](https://general-intelligence-systems.github.io/agent2agent/schema-validation/) - This guide covers the 47 A2A protocol types available as validated Ruby objects.
 
@@ -40,7 +57,7 @@ Please see the [project documentation](https://general-intelligence-systems.gith
 
   - [Example: Multi-Agent](https://general-intelligence-systems.github.io/agent2agent/examples-multi-agent/) - LLM-powered orchestration routing requests to remote agents via A2A::Client.
 
-  - [Example: Full Agent](https://general-intelligence-systems.github.io/agent2agent/examples-full/) - All 11 A2A protocol operations in a single agent with SQLite, SSE, and push notifications.
+  - [Example: Full Agent](https://general-intelligence-systems.github.io/agent2agent/examples-full/) - The core A2A protocol operations in a single agent with an in-memory store and SSE streaming.
 
 ## Development
 

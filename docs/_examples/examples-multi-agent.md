@@ -10,7 +10,7 @@ description: 'Three A2A agents communicating via the protocol: an LLM-powered or
 
 Three A2A agents communicating via the protocol: an LLM-powered orchestrator discovers remote agents and delegates tasks to the most appropriate one.
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/multi-agent)
 
 ## What you'll learn
 
@@ -40,8 +40,8 @@ Requires an LLM API key. Set one of:
 ## Step 1: Start all three services
 
 ```bash
-git clone https://github.com/general-intelligence-systems/a2a.git
-cd a2a/examples/multi-agent
+git clone https://github.com/general-intelligence-systems/agent2agent.git
+cd agent2agent/examples/multi-agent
 ANTHROPIC_API_KEY=sk-... docker compose up -d --build
 ```
 
@@ -152,11 +152,11 @@ docker compose logs host
 You should see:
 
 ```
-host-1  |   1.0s     info: A2A::Agent [pid=1] [2025-05-01 12:00:01 +0000]
+host-1  |   1.0s     info: main [pid=1] [2025-05-01 12:00:01 +0000]
 host-1  |                | Discovered agent: Greeter Agent at http://greeter:9292
-host-1  |   1.0s     info: A2A::Agent [pid=1] [2025-05-01 12:00:01 +0000]
+host-1  |   1.0s     info: main [pid=1] [2025-05-01 12:00:01 +0000]
 host-1  |                | Discovered agent: Translator Agent at http://translator:9293
-host-1  |   1.5s     info: A2A::Agent [pid=1] [2025-05-01 12:00:01 +0000]
+host-1  |   1.5s     info: main [pid=1] [2025-05-01 12:00:01 +0000]
 host-1  |                | Routing to 'greeter' for: Greet Alice for her birthday
 ```
 
@@ -236,4 +236,4 @@ docker compose down
 | `*/Dockerfile` | Per-service container build |
 | `docker-compose.yml` | Three-service compose config |
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/multi-agent)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/multi-agent)

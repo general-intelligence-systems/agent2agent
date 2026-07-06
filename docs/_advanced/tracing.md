@@ -18,7 +18,7 @@ The `agent2agent` gem ships trace providers that instrument the request lifecycl
 |-----------|-------|----------------|
 | `a2a.server.call` | `A2A::Server` | `http.method`, `http.path`, `http.status_code` |
 | `a2a.server.triage.call` | `A2A::Server::Triage` | `a2a.operation`, `a2a.proto_operation` |
-| `a2a.server.dispatcher.call` | `A2A::Server::Dispatcher` | `a2a.operation`, `http.status_code`, `a2a.response_type` |
+| `a2a.agent.call` | `A2A::Agent` | `a2a.operation`, `a2a.response_type`, `a2a.error.code` |
 | `a2a.bindings.json_rpc.call` | `A2A::Server::Bindings::JsonRpc` | `rpc.method`, `rpc.jsonrpc.request_id`, `a2a.response_type` |
 | `a2a.bindings.rest.call` | `A2A::Server::Bindings::Rest` | `a2a.verb`, `a2a.path`, `a2a.response_type` |
 
@@ -178,16 +178,16 @@ The outermost span covering the full Rack request/response cycle.
 
 Resolves which A2A operation the request maps to.
 
-- `a2a.operation` -- Resolved operation name (e.g., `send_message`, `get_task`)
+- `a2a.operation` -- Resolved operation name (e.g., `SendMessage`, `GetTask`)
 - `a2a.proto_operation` -- Protocol buffer operation name
 
-### `a2a.server.dispatcher.call`
+### `a2a.agent.call`
 
-Dispatches the resolved operation to the agent handler.
+Runs your handler block (wrapped in the `A2A::Agent` error boundary).
 
-- `a2a.operation` -- Operation being dispatched
-- `http.status_code` -- Response status code
+- `a2a.operation` -- Operation being handled
 - `a2a.response_type` -- One of `stream`, `error`, or `result`
+- `a2a.error.code` -- JSON-RPC error code (only when the result is an error)
 
 ### `a2a.bindings.json_rpc.call`
 
@@ -203,6 +203,6 @@ Handles JSON-RPC 2.0 protocol binding.
 Handles HTTP+JSON/REST protocol binding.
 
 - `http.status_code` -- Response status code
-- `a2a.verb` -- REST verb (e.g., `send`, `get`, `cancel`)
-- `a2a.path` -- Request path
+- `a2a.verb` -- Lowercase HTTP method (e.g., `post`, `get`, `delete`)
+- `a2a.path` -- Request path with the `/rest` prefix stripped
 - `a2a.response_type` -- One of `stream`, `error`, or `result`

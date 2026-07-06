@@ -2,42 +2,37 @@
 layout: default
 title: Full Echo Agent
 nav_order: 6
-description: Demonstrates all 11 A2A protocol operations in a single agent with Falcon-native
-  SSE streaming and a SQLite-backed persistent task store.
+description: The most complete example agent -- task lifecycle, Falcon-native SSE
+  streaming, history truncation, pagination, cancellation, and error handling.
 ---
 
 # Full Echo Agent
 
-Demonstrates all 11 A2A protocol operations in a single agent with Falcon-native SSE streaming and a SQLite-backed persistent task store.
+The most complete example agent: task lifecycle, Falcon-native SSE streaming, history truncation, pagination, cancellation, and error handling — all in one pattern-matching handler backed by an in-memory task hash.
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/full)
 
 ## What you'll learn
 
-All 11 A2A operations:
+The operations this agent handles:
 
-1. **SendMessage** -- echo with task creation and continuation
-2. **SendStreamingMessage** -- SSE streaming via `Protocol::HTTP::Body::Writable`
-3. **GetTask** -- retrieve task by ID with optional history truncation
-4. **ListTasks** -- paginated task listing with filters
-5. **CancelTask** -- cancel in-progress tasks
-6. **SubscribeToTask** -- real-time SSE updates via `Async::Queue` pub/sub
-7. **CreateTaskPushNotificationConfig** -- register webhook configs
-8. **GetTaskPushNotificationConfig** -- retrieve a specific config
-9. **ListTaskPushNotificationConfigs** -- list all configs for a task
-10. **DeleteTaskPushNotificationConfig** -- remove a config
-11. **GetExtendedAgentCard** -- returns unsupported (demonstrates error handling)
+1. **SendMessage** -- echo with task creation and continuation guard
+2. **SendStreamingMessage** -- SSE streaming via `env["a2a.stream"]`
+3. **GetTask** -- retrieve task by ID with history truncation (`env["a2a.history_length"]`)
+4. **ListTasks** -- paginated task listing with filters (`env["a2a.page_size"]`)
+5. **CancelTask** -- cancel in-progress tasks, with `TaskNotCancelableError` for terminal ones
 
 Key features:
 - Falcon-native SSE streaming (no threads, pure async fibers)
-- SQLite-backed persistent task store
-- Push notification config CRUD
+- In-memory task state guarded by `Async::Semaphore`
+- Server caps: `A2A.agent(agent_card: card, history_length: 20, page_size: 50)`
+- Unhandled operations automatically answer with `UnsupportedOperationError` (`-32004`)
 
 ## Step 1: Start the agent
 
 ```bash
-git clone https://github.com/general-intelligence-systems/a2a.git
-cd a2a/examples/full
+git clone https://github.com/general-intelligence-systems/agent2agent.git
+cd agent2agent/examples/full
 docker compose up -d --build
 ```
 
@@ -63,14 +58,14 @@ agent-1  |                | Full Echo Agent starting...
 agent-1  |   0.0s     info: main [pid=1] [2025-05-01 12:00:00 +0000]
 agent-1  |                | Agent card: Full Echo Agent
 agent-1  |   0.0s     info: main [pid=1] [2025-05-01 12:00:00 +0000]
-agent-1  |                | Store: SQLite (echo_agent.db)
+agent-1  |                | Store: in-memory (Async::Semaphore)
 agent-1  |   0.0s     info: main [pid=1] [2025-05-01 12:00:00 +0000]
 agent-1  |                | Streaming: Falcon-native SSE via Protocol::HTTP::Body::Writable
 agent-1  |   0.0s     info: main [pid=1] [2025-05-01 12:00:00 +0000]
 agent-1  |                | Concurrency: Async fibers (no threads)
 ```
 
-## Step 3: Operation 1 -- SendMessage
+## Step 3: SendMessage
 
 ```bash
 curl -s -X POST http://localhost:9292/ \
@@ -110,9 +105,9 @@ Expected output:
 }
 ```
 
-**Copy the `task.id` value.** You'll need it for GetTask, CancelTask, SubscribeToTask, and push notification config steps.
+**Copy the `task.id` value.** You'll need it for GetTask and CancelTask.
 
-## Step 4: Operation 1b -- SendMessage (continuation)
+## Step 4: SendMessage (continuation)
 
 You can continue an existing task by providing `taskId` in the message. Replace `TASK_ID_HERE`:
 
@@ -144,9 +139,9 @@ Expected output:
 }
 ```
 
-This correctly errors because the task from Step 3 is already `COMPLETED` (a terminal state). You cannot continue a completed task.
+This correctly errors because the task from Step 3 is already `COMPLETED` (a terminal state). You cannot continue a completed task. For a working continuation flow, see the [multi-turn example]({% link _examples/examples-multi-turn.md %}).
 
-## Step 5: Operation 2 -- SendStreamingMessage
+## Step 5: SendStreamingMessage
 
 ```bash
 curl -N -X POST http://localhost:9292/ \
@@ -173,7 +168,7 @@ Three SSE events:
 
 Press `Ctrl+C` after the stream ends.
 
-## Step 6: Operation 3 -- GetTask
+## Step 6: GetTask
 
 Retrieve a task by ID. Replace `TASK_ID_HERE` with the `id` from Step 3:
 
@@ -211,7 +206,7 @@ Expected output:
 }
 ```
 
-You can also truncate history with `historyLength`:
+You can also truncate history with `historyLength` (the server clamps it to its own `history_length: 20` cap):
 
 ```bash
 curl -s -X POST http://localhost:9292/ \
@@ -221,7 +216,7 @@ curl -s -X POST http://localhost:9292/ \
 
 This returns only the last message in `history`.
 
-## Step 7: Operation 4 -- ListTasks
+## Step 7: ListTasks
 
 ```bash
 curl -s -X POST http://localhost:9292/ \
@@ -277,9 +272,9 @@ curl -s -X POST http://localhost:9292/ \
   -d '{"jsonrpc":"2.0","id":8,"method":"ListTasks","params":{"includeArtifacts":true}}' | jq .
 ```
 
-## Step 8: Operation 5 -- CancelTask
+## Step 8: CancelTask
 
-First, create a new task to cancel (we need a non-terminal task, so let's create one via SendMessage and immediately try to cancel -- since this echo agent completes instantly, we'll see the expected error for canceling a completed task):
+Create a new task to cancel (since this echo agent completes instantly, we'll see the expected error for canceling a completed task):
 
 ```bash
 curl -s -X POST http://localhost:9292/ \
@@ -321,16 +316,16 @@ Expected output (the echo agent completes tasks instantly, so it's already termi
 }
 ```
 
-This correctly returns an error because the task is already completed. To see a successful cancellation, use the [async-jobs example](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs) which has long-running tasks.
+The handler raises `A2A::TaskNotCancelableError` for terminal tasks — the server formats it into this spec-compliant response. To see a successful cancellation, cancel a long-running task like those in the [push notifications example]({% link _examples/examples-push-notifications.md %}).
 
-## Step 9: Operation 6 -- SubscribeToTask
+## Step 9: Unhandled operations
 
-SubscribeToTask requires a non-terminal task. Since this echo agent completes tasks instantly, subscribing to a completed task returns an error:
+The handler's `case ... in` doesn't match every operation — anything unmatched automatically becomes an `UnsupportedOperationError`:
 
 ```bash
 curl -s -X POST http://localhost:9292/ \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":11,"method":"SubscribeToTask","params":{"id":"TASK_ID_HERE"}}' | jq .
+  -d '{"jsonrpc":"2.0","id":11,"method":"GetExtendedAgentCard","params":{}}' | jq .
 ```
 
 Expected output:
@@ -341,154 +336,7 @@ Expected output:
   "id": 11,
   "error": {
     "code": -32004,
-    "message": "Cannot subscribe to a task in a terminal state",
-    "data": [
-      {
-        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
-        "reason": "UNSUPPORTED_OPERATION",
-        "domain": "a2a-protocol.org",
-        "metadata": {
-          "taskId": "TASK_ID_HERE",
-          "state": "TASK_STATE_COMPLETED"
-        }
-      }
-    ]
-  }
-}
-```
-
-To see live SSE subscriptions in action, use the [async-jobs example](https://github.com/general-intelligence-systems/a2a/tree/main/examples/async-jobs).
-
-## Step 10: Operation 7 -- CreateTaskPushNotificationConfig
-
-Register a webhook config on an existing task. Replace `TASK_ID_HERE`:
-
-```bash
-curl -s -X POST http://localhost:9292/ \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":12,"method":"CreateTaskPushNotificationConfig","params":{
-    "taskId":"TASK_ID_HERE",
-    "url":"http://example.com/webhook",
-    "token":"my-secret-token"
-  }}' | jq .
-```
-
-Expected output:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 12,
-  "result": {
-    "id": "cfg-1234-5678-9abc-def012345678",
-    "url": "http://example.com/webhook",
-    "token": "my-secret-token"
-  }
-}
-```
-
-**Copy the config `id`** for the next steps.
-
-## Step 11: Operation 8 -- GetTaskPushNotificationConfig
-
-Retrieve a specific config. Replace `TASK_ID_HERE` and `CONFIG_ID_HERE`:
-
-```bash
-curl -s -X POST http://localhost:9292/ \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":13,"method":"GetTaskPushNotificationConfig","params":{
-    "taskId":"TASK_ID_HERE",
-    "id":"CONFIG_ID_HERE"
-  }}' | jq .
-```
-
-Expected output:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 13,
-  "result": {
-    "id": "cfg-1234-5678-9abc-def012345678",
-    "url": "http://example.com/webhook",
-    "token": "my-secret-token"
-  }
-}
-```
-
-## Step 12: Operation 9 -- ListTaskPushNotificationConfigs
-
-List all webhook configs for a task. Replace `TASK_ID_HERE`:
-
-```bash
-curl -s -X POST http://localhost:9292/ \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":14,"method":"ListTaskPushNotificationConfigs","params":{
-    "taskId":"TASK_ID_HERE"
-  }}' | jq .
-```
-
-Expected output:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 14,
-  "result": {
-    "configs": [
-      {
-        "id": "cfg-1234-5678-9abc-def012345678",
-        "url": "http://example.com/webhook",
-        "token": "my-secret-token"
-      }
-    ],
-    "nextPageToken": ""
-  }
-}
-```
-
-## Step 13: Operation 10 -- DeleteTaskPushNotificationConfig
-
-Remove a webhook config. Replace `TASK_ID_HERE` and `CONFIG_ID_HERE`:
-
-```bash
-curl -s -X POST http://localhost:9292/ \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":15,"method":"DeleteTaskPushNotificationConfig","params":{
-    "taskId":"TASK_ID_HERE",
-    "id":"CONFIG_ID_HERE"
-  }}' | jq .
-```
-
-Expected output:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 15,
-  "result": null
-}
-```
-
-## Step 14: Operation 11 -- GetExtendedAgentCard
-
-This agent declares `extendedAgentCard: false` in its capabilities. Calling this operation demonstrates proper error handling:
-
-```bash
-curl -s -X POST http://localhost:9292/ \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":16,"method":"GetExtendedAgentCard","params":{}}' | jq .
-```
-
-Expected output:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 16,
-  "error": {
-    "code": -32004,
-    "message": "Extended agent card is not supported",
+    "message": "Operation not supported: GetExtendedAgentCard",
     "data": [
       {
         "@type": "type.googleapis.com/google.rpc.ErrorInfo",
@@ -500,7 +348,9 @@ Expected output:
 }
 ```
 
-## Step 15: Cleanup
+No `else` branch needed — the server converts the pattern-match miss into this error. `SubscribeToTask` and the push notification config operations respond the same way for this agent; see the [push notifications example]({% link _examples/examples-push-notifications.md %}) for an agent that handles the config CRUD operations.
+
+## Step 10: Cleanup
 
 ```bash
 docker compose down
@@ -510,10 +360,10 @@ docker compose down
 
 | File | Purpose |
 |---|---|
-| `config.ru` | All 11 operation handlers, agent card, store setup |
+| `config.ru` | The handler block -- all operations, agent card, in-memory task state |
 | `falcon.rb` | Falcon server config (binds to port 9292) |
 | `Gemfile` | Dependencies |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Single-service compose config |
 
-[View source on GitHub](https://github.com/general-intelligence-systems/a2a/tree/main/examples/full)
+[View source on GitHub](https://github.com/general-intelligence-systems/agent2agent/tree/main/examples/full)

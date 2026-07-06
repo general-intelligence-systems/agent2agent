@@ -6,7 +6,7 @@ Demonstrates asynchronous task processing with webhook-based push notification d
 
 ## What you'll learn
 
-- Async background processing with `A2A::Store::Processor`
+- Async background processing in a detached fiber (`Async { ... }`)
 - Push notification config (inline via `SendMessage` and CRUD operations)
 - Webhook delivery on state transitions and artifact creation
 - Two-service setup: agent + webhook receiver
@@ -329,6 +329,7 @@ docker compose down
 | File | Purpose |
 |---|---|
 | `agent/config.ru` | Agent -- async processing, push notification config CRUD, webhook delivery |
+| `agent/agent_card.yml` | Agent card definition |
 | `agent/falcon.rb` | Falcon config for agent (port 9292) |
 | `agent/Gemfile` | Agent dependencies |
 | `agent/Dockerfile` | Container build for the agent service |
