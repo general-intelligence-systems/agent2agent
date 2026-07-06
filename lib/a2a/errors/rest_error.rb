@@ -20,7 +20,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::RestError" do
     it "has correct http_status and message" do
       err = A2A::RestError.new("Not Found", http_status: 404)
@@ -65,4 +65,3 @@ test do
       h[:data].should == data
     end
   end
-end

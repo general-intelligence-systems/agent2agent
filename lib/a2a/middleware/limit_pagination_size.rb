@@ -44,7 +44,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Middleware::LimitPaginationSize" do
     it "uses max as default page size when not specified by client" do
       request = Object.new
@@ -130,4 +130,3 @@ test do
       result.should == 20
     end
   end
-end

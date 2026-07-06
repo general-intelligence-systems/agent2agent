@@ -61,7 +61,8 @@ end
 
 ::Faraday::Response.register_middleware(a2a_rest: A2A::Faraday::Middleware::REST::Response)
 
-test do
+__END__
+describe "A2A::Faraday::Middleware::REST::Response" do
   middleware = A2A::Faraday::Middleware::REST::Response
   operation = A2A::Proto.operation("GetTask")
 

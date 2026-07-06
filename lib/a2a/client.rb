@@ -127,7 +127,8 @@ module A2A
   end
 end
 
-test do
+__END__
+describe "A2A::Client" do
   # --- JSON-RPC binding (default) ---
 
   it "generates methods for all Proto operations" do

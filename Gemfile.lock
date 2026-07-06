@@ -11,7 +11,7 @@ PATH
       json_schemer (~> 2.5)
       protocol-http (~> 0.62)
       rack (~> 3.0)
-      scampi
+      scampi (~> 1.0)
       sqlite3
 
 GEM

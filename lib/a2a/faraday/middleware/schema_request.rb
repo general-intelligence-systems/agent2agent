@@ -30,7 +30,8 @@ end
 
 ::Faraday::Request.register_middleware(a2a_schema: A2A::Faraday::Middleware::SchemaRequest)
 
-test do
+__END__
+describe "A2A::Faraday::Middleware::SchemaRequest" do
   middleware = A2A::Faraday::Middleware::SchemaRequest
 
   it "converts Schema::Definition to hash" do

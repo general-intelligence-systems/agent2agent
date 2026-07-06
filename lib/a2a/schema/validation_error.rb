@@ -78,7 +78,8 @@ module A2A
   end
 end
 
-test do
+__END__
+describe "A2A::Schema::ValidationError" do
   error_data = [
     {
       "data_pointer" => "",

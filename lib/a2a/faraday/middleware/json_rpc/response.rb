@@ -57,7 +57,8 @@ end
 
 ::Faraday::Response.register_middleware(a2a_json_rpc: A2A::Faraday::Middleware::JsonRpc::Response)
 
-test do
+__END__
+describe "A2A::Faraday::Middleware::JsonRpc::Response" do
   middleware = A2A::Faraday::Middleware::JsonRpc::Response
   operation = A2A::Proto.operation("GetTask")
 

@@ -337,7 +337,7 @@ require "a2a/errors/rest_error"
 # | ExtendedAgentCardNotConfiguredError   | The agent lacks a configured extended agent card when required.
 # | ExtensionSupportRequiredError         | A required extension was not declared as supported by the client.
 # | VersionNotSupportedError              | The requested A2A-Version is not supported by the agent.
-test do
+__END__
   describe "A2A::Error" do
     it "has code, http_status, and message" do
       err = A2A::Error.new("boom", code: -32000, http_status: 500)
@@ -532,4 +532,3 @@ test do
       err.is_a?(A2A::Error).should == true
     end
   end
-end

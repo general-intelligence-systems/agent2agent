@@ -44,7 +44,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::SSE::JsonRpcStream" do
     it "wraps events in JSON-RPC 2.0 envelopes" do
       stream = A2A::SSE::JsonRpcStream.new(
@@ -85,4 +85,3 @@ test do
       parsed["result"]["statusUpdate"]["contextId"].should == "c1"
     end
   end
-end

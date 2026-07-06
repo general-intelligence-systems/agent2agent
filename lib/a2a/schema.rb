@@ -245,7 +245,8 @@ module A2A
   end
 end
 
-test do
+__END__
+describe "A2A::Schema" do
   schema = A2A::Schema
 
   it "loads the raw schema" do

@@ -122,7 +122,7 @@ module A2A
   end
 end
 
-test do
+__END__
   require "async"
 
   describe "A2A::SSE::Stream" do
@@ -254,4 +254,3 @@ test do
       parsed["task"]["id"].should == "override"
     end
   end
-end

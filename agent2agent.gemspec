@@ -21,7 +21,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'async'
   spec.add_dependency 'async-http', "~> 0.95"
   spec.add_dependency 'protocol-http', "~> 0.62"
-  spec.add_dependency 'scampi'
   spec.add_dependency 'rack', "~> 3.0"
   spec.add_dependency "json_schemer", "~> 2.5"
   spec.add_dependency "google-protobuf", "~> 4.34"
@@ -32,4 +31,5 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency 'rake', '~> 13.0'
   spec.add_development_dependency 'falcon', '~> 0.55'
+  spec.add_development_dependency 'scampi', '~> 1.0'
 end

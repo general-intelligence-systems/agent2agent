@@ -82,7 +82,8 @@ end
 
 ::Faraday::Request.register_middleware(a2a_rest: A2A::Faraday::Middleware::REST::Request)
 
-test do
+__END__
+describe "A2A::Faraday::Middleware::REST::Request" do
   middleware = A2A::Faraday::Middleware::REST::Request
 
   it "rewrites POST operation with correct path, verb, and content-type" do

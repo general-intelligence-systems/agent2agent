@@ -71,7 +71,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::SSE::EventParser" do
     # --- REST binding ---
 
@@ -199,4 +199,3 @@ test do
       events[0].task.id.should == "t1"
     end
   end
-end

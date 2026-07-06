@@ -76,7 +76,8 @@ module A2A
   end
 end
 
-test do
+__END__
+describe "A2A::Server::Bindings::REST" do
   require "a2a/test_helpers"
 
   server = A2A::Server.new(agent_card: { "name" => "Test" })

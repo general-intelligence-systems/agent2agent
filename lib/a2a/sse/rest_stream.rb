@@ -29,7 +29,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::SSE::RestStream" do
     it "emits bare JSON events (no envelope)" do
       stream = A2A::SSE::RestStream.new(task_id: "t1", context_id: "c1")
@@ -59,4 +59,3 @@ test do
       parsed["task"]["contextId"].should == "c1"
     end
   end
-end

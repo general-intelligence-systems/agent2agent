@@ -86,7 +86,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Middleware::FetchTask" do
     before do
       @store = Object.new
@@ -225,4 +225,3 @@ test do
       mw.call(env).should == task_data
     end
   end
-end

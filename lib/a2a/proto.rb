@@ -227,7 +227,8 @@ module A2A
   end
 end
 
-test do
+__END__
+describe "A2A::Proto" do
   proto = A2A::Proto
 
   it "finds 11 operations" do

@@ -98,7 +98,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Middleware::SSEStream" do
     it "sets a StreamBuilder on env[\"a2a.stream\"]" do
       seen_stream = nil
@@ -232,4 +232,3 @@ test do
       parsed["statusUpdate"]["contextId"].should == "c1"
     end
   end
-end

@@ -52,7 +52,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Middleware::LimitHistoryLength" do
     it "defaults to server max when client does not specify" do
       request = Object.new
@@ -120,4 +120,3 @@ test do
       mw.call(env).should.be.kind_of(Integer)
     end
   end
-end

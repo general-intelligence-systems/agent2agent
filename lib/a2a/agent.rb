@@ -121,7 +121,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Agent" do
     it "registers handlers via the on DSL" do
       agent = A2A::Agent.new do
@@ -288,4 +288,3 @@ test do
       lambda { agent.handlers.first.call(env) }.should.raise(RuntimeError)
     end
   end
-end

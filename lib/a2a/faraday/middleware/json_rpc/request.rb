@@ -43,7 +43,8 @@ end
 
 ::Faraday::Request.register_middleware(a2a_json_rpc: A2A::Faraday::Middleware::JsonRpc::Request)
 
-test do
+__END__
+describe "A2A::Faraday::Middleware::JsonRpc::Request" do
   middleware = A2A::Faraday::Middleware::JsonRpc::Request
   operation = A2A::Proto.operation("SendMessage")
 

@@ -23,7 +23,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::JsonRpcError" do
     it "has correct code and message" do
       err = A2A::JsonRpcError.new("Task not found", code: -32001)
@@ -68,4 +68,3 @@ test do
       h[:data].should == data
     end
   end
-end

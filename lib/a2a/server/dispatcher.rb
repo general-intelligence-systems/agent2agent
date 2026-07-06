@@ -59,7 +59,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Server::Dispatcher" do
     it "registers and dispatches to a handler" do
       handler = Object.new
@@ -124,4 +124,3 @@ test do
       received.should == ["SendMessage", "GetTask"]
     end
   end
-end

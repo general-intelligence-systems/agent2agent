@@ -45,7 +45,7 @@ module A2A
   end
 end
 
-test do
+__END__
   describe "A2A::Middleware::ExtractMessage" do
     it "extracts text from message parts" do
       part1 = Object.new
@@ -117,4 +117,3 @@ test do
       result.should == "from hash"
     end
   end
-end
