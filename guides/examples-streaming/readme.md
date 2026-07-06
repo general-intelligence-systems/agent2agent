@@ -1,1 +1,0 @@
-../../examples/streaming-artifacts/readme.md

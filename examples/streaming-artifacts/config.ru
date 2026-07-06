@@ -3,7 +3,6 @@
 require "bundler/setup"
 require "a2a"
 require "a2a/server/sse"
-require "a2a/server/middleware"
 require "async/semaphore"
 require "console"
 require "securerandom"
@@ -37,7 +36,8 @@ CODE_FILES = {
 TASKS = {}
 LOCK  = Async::Semaphore.new(1)
 
-agent = A2A::Agent.new do
+agent = A2A.agent do |env|
+  case env["a2a.operation"]
 
   # Streams multiple code files as separate artifacts, each in chunks.
   # Event sequence for each file:
@@ -45,119 +45,71 @@ agent = A2A::Agent.new do
   #   artifactUpdate { append: true,  lastChunk: false }  -- middle chunks
   #   artifactUpdate { append: true,  lastChunk: true  }  -- final chunk
   #
-  on "SendStreamingMessage" do
-    use A2A::Server::Middleware::ExtractMessage
-    respond_with -> (env) {
-      request = env["a2a.request"]
-      msg = request.message
-      text = env["a2a.message"]
+  in "SendStreamingMessage"
+    request = env["a2a.request"]
+    msg = request.message
+    text = env["a2a.message"]
 
-      context_id = msg.context_id
-      context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
-      task_id    = SecureRandom.uuid
+    context_id = msg.context_id
+    context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
+    task_id    = SecureRandom.uuid
 
-      LOCK.acquire do
-        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
-        TASKS[task_id][:history] << {
-          "messageId" => msg.message_id || SecureRandom.uuid,
-          "role"      => "ROLE_USER",
-          "parts"     => [{ "text" => text }],
-        }
-        TASKS[task_id][:state] = "TASK_STATE_WORKING"
-        TASKS[task_id][:updated_at] = NOW.()
-      end
+    LOCK.acquire do
+      TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
+      TASKS[task_id][:history] << {
+        "messageId" => msg.message_id || SecureRandom.uuid,
+        "role"      => "ROLE_USER",
+        "parts"     => [{ "text" => text }],
+      }
+      TASKS[task_id][:state] = "TASK_STATE_WORKING"
+      TASKS[task_id][:updated_at] = NOW.()
+    end
 
-      env["a2a.stream"].open(task_id: task_id, context_id: context_id) do |s|
-        sleep 0.05
+    env["a2a.stream"].open(task_id: task_id, context_id: context_id) do |s|
+      sleep 0.05
 
-        # Event 1: initial task snapshot
-        s.task(status: { state: "TASK_STATE_WORKING", timestamp: NOW.() })
+      # Event 1: initial task snapshot
+      s.task(status: { state: "TASK_STATE_WORKING", timestamp: NOW.() })
 
-        # Stream each file as a separate artifact with multiple chunks
-        CODE_FILES.each_with_index do |(filename, chunks), file_idx|
-          artifact_id = SecureRandom.uuid
+      # Stream each file as a separate artifact with multiple chunks
+      CODE_FILES.each_with_index do |(filename, chunks), file_idx|
+        artifact_id = SecureRandom.uuid
 
-          chunks.each_with_index do |chunk_text, chunk_idx|
-            is_first = chunk_idx == 0
-            is_last  = chunk_idx == chunks.length - 1
+        chunks.each_with_index do |chunk_text, chunk_idx|
+          is_first = chunk_idx == 0
+          is_last  = chunk_idx == chunks.length - 1
 
-            sleep 0.05  # simulate progressive generation
+          sleep 0.05  # simulate progressive generation
 
-            s.artifact_update(
-              artifact: {
-                artifact_id: artifact_id,
-                name:        filename,
-                description: "Generated file: #{filename}",
-                parts:       [{ text: chunk_text }],
-              },
-              append:     !is_first,
-              last_chunk: is_last,
-            )
-          end
-
-          # Status update between files
-          if file_idx < CODE_FILES.size - 1
-            s.status_update(
-              status: {
-                state:     "TASK_STATE_WORKING",
-                timestamp: NOW.(),
-                message:   {
-                  message_id: SecureRandom.uuid,
-                  role:       "ROLE_AGENT",
-                  parts:      [{ text: "Generated #{filename}, working on next file..." }],
-                },
-              },
-            )
-          end
+          s.artifact_update(
+            artifact: {
+              artifact_id: artifact_id,
+              name:        filename,
+              description: "Generated file: #{filename}",
+              parts:       [{ text: chunk_text }],
+            },
+            append:     !is_first,
+            last_chunk: is_last,
+          )
         end
 
-        # Persist final artifacts to the store (assembled from chunks)
-        LOCK.acquire do
-          CODE_FILES.each do |filename, chunks|
-            TASKS[task_id][:artifacts] << {
-              "artifactId" => SecureRandom.uuid,
-              "name"       => filename,
-              "parts"      => [{ "text" => chunks.join }],
-            }
-          end
-
-          TASKS[task_id][:history] << {
-            "messageId" => SecureRandom.uuid,
-            "role"      => "ROLE_AGENT",
-            "parts"     => [{ "text" => "Generated #{CODE_FILES.size} files: #{CODE_FILES.keys.join(", ")}" }],
-          }
-
-          TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
-          TASKS[task_id][:updated_at] = NOW.()
+        # Status update between files
+        if file_idx < CODE_FILES.size - 1
+          s.status_update(
+            status: {
+              state:     "TASK_STATE_WORKING",
+              timestamp: NOW.(),
+              message:   {
+                message_id: SecureRandom.uuid,
+                role:       "ROLE_AGENT",
+                parts:      [{ text: "Generated #{filename}, working on next file..." }],
+              },
+            },
+          )
         end
-
-        # Final status: completed
-        s.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: NOW.() })
-      end
-    }
-  end
-
-  on "SendMessage" do
-    use A2A::Server::Middleware::ExtractMessage
-    respond_with -> (env) {
-      request = env["a2a.request"]
-      msg = request.message
-      text = env["a2a.message"]
-
-      context_id = msg.context_id
-      context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
-      task_id    = SecureRandom.uuid
-
-      LOCK.acquire do
-        TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
-        TASKS[task_id][:history] << {
-          "messageId" => msg.message_id || SecureRandom.uuid,
-          "role"      => "ROLE_USER",
-          "parts"     => [{ "text" => text }],
-        }
       end
 
-      # Generate all files synchronously
+      # Persist final artifacts to the store (assembled from chunks)
       LOCK.acquire do
         CODE_FILES.each do |filename, chunks|
           TASKS[task_id][:artifacts] << {
@@ -177,42 +129,77 @@ agent = A2A::Agent.new do
         TASKS[task_id][:updated_at] = NOW.()
       end
 
-      task = LOCK.acquire { TASKS[task_id] }
+      # Final status: completed
+      s.status_update(status: { state: "TASK_STATE_COMPLETED", timestamp: NOW.() })
+    end
 
-      A2A::Protocol::JsonSchema["Send Message Response"].new(
-        task: {
-          "id"        => task[:id],
-          "contextId" => task[:context_id],
-          "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
-          "artifacts" => task[:artifacts],
-          "history"   => task[:history],
+  in "SendMessage"
+    request = env["a2a.request"]
+    msg = request.message
+    text = env["a2a.message"]
+
+    context_id = msg.context_id
+    context_id = context_id.to_s.empty? ? SecureRandom.uuid : context_id
+    task_id    = SecureRandom.uuid
+
+    LOCK.acquire do
+      TASKS[task_id] = { id: task_id, context_id: context_id, state: "TASK_STATE_SUBMITTED", updated_at: NOW.(), artifacts: [], history: [] }
+      TASKS[task_id][:history] << {
+        "messageId" => msg.message_id || SecureRandom.uuid,
+        "role"      => "ROLE_USER",
+        "parts"     => [{ "text" => text }],
+      }
+    end
+
+    # Generate all files synchronously
+    LOCK.acquire do
+      CODE_FILES.each do |filename, chunks|
+        TASKS[task_id][:artifacts] << {
+          "artifactId" => SecureRandom.uuid,
+          "name"       => filename,
+          "parts"      => [{ "text" => chunks.join }],
         }
-      )
-    }
-  end
+      end
 
-  on "GetTask" do
-    respond_with -> (env) {
-      request = env["a2a.request"]
-      id = request.id
+      TASKS[task_id][:history] << {
+        "messageId" => SecureRandom.uuid,
+        "role"      => "ROLE_AGENT",
+        "parts"     => [{ "text" => "Generated #{CODE_FILES.size} files: #{CODE_FILES.keys.join(", ")}" }],
+      }
 
-      task = LOCK.acquire { TASKS[id] }
-      raise A2A::TaskNotFoundError.new(id) unless task
+      TASKS[task_id][:state] = "TASK_STATE_COMPLETED"
+      TASKS[task_id][:updated_at] = NOW.()
+    end
 
-      A2A::Protocol::JsonSchema["Task"].new(
-        id:         task[:id],
-        context_id: task[:context_id],
-        status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
-        artifacts:  task[:artifacts],
-      )
-    }
+    task = LOCK.acquire { TASKS[task_id] }
+
+    A2A::Protocol::JsonSchema["Send Message Response"].new(
+      task: {
+        "id"        => task[:id],
+        "contextId" => task[:context_id],
+        "status"    => { "state" => task[:state], "timestamp" => task[:updated_at] },
+        "artifacts" => task[:artifacts],
+        "history"   => task[:history],
+      }
+    )
+
+  in "GetTask"
+    request = env["a2a.request"]
+    id = request.id
+
+    task = LOCK.acquire { TASKS[id] }
+    raise A2A::TaskNotFoundError.new(id) unless task
+
+    A2A::Protocol::JsonSchema["Task"].new(
+      id:         task[:id],
+      context_id: task[:context_id],
+      status:     { "state" => task[:state], "timestamp" => task[:updated_at] },
+      artifacts:  task[:artifacts],
+    )
   end
 end
-
-app = A2A::Server.new(agent_card: agent_card)
-app.register(agent)
 
 Console.info(self) { "Code Generator starting..." }
 Console.info(self) { "Streaming artifacts example: chunked files with append/lastChunk" }
 
-run app
+run A2A::Server.new(agent_card: agent_card, agent: agent)

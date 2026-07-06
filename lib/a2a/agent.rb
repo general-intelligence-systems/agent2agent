@@ -1,290 +1,142 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
+require "console"
 require "a2a"
 
 module A2A
-  # DSL wrapper that collects operation handlers for an A2A agent.
+  # Builds the terminal rack app for an A2A server from a block.
   #
-  # An Agent produces handler objects that conform to the Dispatcher's
-  # contract (#operations, #call). Register an agent on a Server the
-  # same way you would register a plain handler.
+  # The block receives the rack env and returns a domain object
+  # (A2A::Protocol::JsonSchema::Definition) — the binding layer formats
+  # it into HTTP. Route operations with pattern matching:
   #
-  #   agent = A2A::Agent.new do
-  #     on "SendMessage" do
-  #       respond_with -> (env) {
-  #         A2A::Protocol::JsonSchema["Send Message Response"].new({})
-  #       }
-  #     end
-  #
-  #     on "GetTask" do
-  #       respond_with -> (env) {
-  #         task = Task.find_by(id: env["a2a.request"].id)
-  #         raise A2A::TaskNotFoundError.new(env["a2a.request"].id) unless task
-  #         task.to_a2a
-  #       }
+  #   agent = A2A.agent do |env|
+  #     case env["a2a.operation"]
+  #     in "SendMessage"
+  #       A2A::Protocol::JsonSchema["Send Message Response"].new({})
+  #     in "GetTask"
+  #       task = Task.find_by(id: env["a2a.request"].id)
+  #       raise A2A::TaskNotFoundError.new(env["a2a.request"].id) unless task
+  #       task.to_a2a
   #     end
   #   end
   #
-  #   server.register(agent)
+  #   run A2A::Server.new(agent_card: { "name" => "My Agent" }, agent: agent)
+  #
+  # To route on request contents as well, match a tuple — Definition
+  # implements deconstruct_keys, so patterns destructure recursively:
+  #
+  #   case [env["a2a.operation"], env["a2a.request"]]
+  #   in ["SendMessage", { message: { task_id: String => id } }] if !id.empty?
+  #     # continuation of task `id`
+  #   in ["SendMessage", _]
+  #     # new task
+  #   end
+  #
+  def self.agent(&block) = Agent.new(&block)
+
+  # Wraps the agent block with the server's error boundary:
+  #
+  #   NoMatchingPatternError -> A2A::UnsupportedOperationError, so an
+  #     unhandled operation falls out of `case ... in` with no else branch
+  #   A2A::Error             -> returned for the binding layer to format
+  #   anything else          -> logged, returned as a JSON-RPC internal error
   #
   class Agent
-    attr_reader :handlers
-
     def initialize(&block)
-      @handlers = []
-      instance_eval(&block) if block
+      raise ArgumentError, "agent requires a block" unless block
+
+      @block = block
     end
 
-    # Define a handler stack for one or more A2A operations.
-    #
-    # The block is evaluated at definition time to build the middleware
-    # stack. Use `use` to add middleware, `respond_with` to set the
-    # terminal handler.
-    #
-    #   on "SendMessage" do
-    #     use SomeMiddleware
-    #     respond_with -> (env) { ... }
-    #   end
-    #
-    def on(*operations, &block)
-      raise ArgumentError, "on requires at least one operation" if operations.empty?
-      raise ArgumentError, "on requires a block" unless block
-
-      builder = StackBuilder.new
-      builder.instance_eval(&block)
-
-      handler = Handler.new(
-        operations: operations.flatten,
-        app:        builder.to_app
+    def call(env)
+      @block.call(env)
+    rescue NoMatchingPatternError
+      A2A::UnsupportedOperationError.new(
+        message: "Operation not supported: #{env["a2a.operation"]}"
       )
-
-      @handlers << handler
-      handler
-    end
-
-    # Builds a per-operation middleware stack.
-    # Collects `use` and `respond_with` calls, compiles into a callable app.
-    class StackBuilder
-      def initialize
-        @middleware = []
-        @terminal   = nil
-      end
-
-      def use(middleware, *args, &block)
-        @middleware << [middleware, args, block]
-      end
-
-      def respond_with(callable)
-        @terminal = callable
-      end
-
-      def to_app
-        raise ArgumentError, "respond_with is required" unless @terminal
-
-        app = Terminal.new(@terminal)
-
-        @middleware.reverse_each do |klass, args, block|
-          app = klass.new(app, *args, &block)
-        end
-
-        app
-      end
-    end
-
-    # Wraps the respond_with lambda as a callable.
-    # Returns whatever the lambda returns.
-    class Terminal
-      def initialize(callable)
-        @callable = callable
-      end
-
-      def call(env)
-        @callable.call(env)
-      end
-    end
-
-    # Handler object produced by the #on DSL method.
-    # Conforms to the Dispatcher contract: #operations, #call.
-    class Handler
-      attr_reader :operations
-
-      def initialize(operations:, app:)
-        @operations = operations
-        @app        = app
-      end
-
-      def call(env)
-        @app.call(env)
-      end
+    rescue A2A::Error => e
+      e
+    rescue => e
+      Console.error(self, "Agent raised #{e.class}: #{e.message}", e)
+      A2A::Error.new("Internal error", code: -32603, http_status: 500)
     end
   end
 end
 
 __END__
   describe "A2A::Agent" do
-    it "registers handlers via the on DSL" do
-      agent = A2A::Agent.new do
-        on "SendMessage" do
-          respond_with -> (env) { :ok }
+    it "requires a block" do
+      lambda { A2A::Agent.new }.should.raise(ArgumentError)
+    end
+
+    it "calls the block with env and returns its result" do
+      agent = A2A.agent { |env| env["a2a.operation"] }
+      agent.call({ "a2a.operation" => "SendMessage" }).should == "SendMessage"
+    end
+
+    it "routes operations with pattern matching" do
+      agent = A2A.agent do |env|
+        case env["a2a.operation"]
+        in "SendMessage" then :sent
+        in "GetTask" then :got
         end
       end
 
-      agent.handlers.length.should == 1
-      agent.handlers.first.operations.should == ["SendMessage"]
+      agent.call({ "a2a.operation" => "SendMessage" }).should == :sent
+      agent.call({ "a2a.operation" => "GetTask" }).should == :got
     end
 
-    it "registers multiple operations on a single handler" do
-      agent = A2A::Agent.new do
-        on "SendMessage", "GetTask" do
-          respond_with -> (env) { :ok }
+    it "returns UnsupportedOperationError when no pattern matches" do
+      agent = A2A.agent do |env|
+        case env["a2a.operation"]
+        in "SendMessage" then :sent
         end
       end
 
-      agent.handlers.first.operations.should == ["SendMessage", "GetTask"]
+      result = agent.call({ "a2a.operation" => "UnknownOp" })
+      result.should.be.is_a(A2A::UnsupportedOperationError)
+      result.code.should == -32004
     end
 
-    it "raises if on is called without operations" do
-      lambda {
-        A2A::Agent.new do
-          on do
-            respond_with -> (env) { :ok }
-          end
-        end
-      }.should.raise(ArgumentError)
+    it "returns A2A::Error when the block raises one" do
+      agent = A2A.agent { |env| raise A2A::TaskNotFoundError.new("t-1") }
+
+      result = agent.call({})
+      result.should.be.is_a(A2A::TaskNotFoundError)
+      result.code.should == -32001
     end
 
-    it "raises if on is called without a block" do
-      lambda {
-        agent = A2A::Agent.new
-        agent.on "SendMessage"
-      }.should.raise(ArgumentError)
+    it "returns internal error when the block raises unexpectedly" do
+      agent = A2A.agent { |env| raise "boom" }
+
+      result = agent.call({})
+      result.should.be.is_a(A2A::Error)
+      result.code.should == -32603
+      result.http_status.should == 500
     end
 
-    it "raises if respond_with is not provided" do
-      lambda {
-        A2A::Agent.new do
-          on "SendMessage" do
-            use Class.new
-          end
-        end
-      }.should.raise(ArgumentError)
-    end
-
-    it "returns the respond_with lambda result" do
-      agent = A2A::Agent.new do
-        on "SendMessage" do
-          respond_with -> (env) { { "echo" => true } }
+    it "matches request contents via deconstruct_keys" do
+      agent = A2A.agent do |env|
+        case [env["a2a.operation"], env["a2a.request"]]
+        in ["SendMessage", { message: { task_id: String => id } }] if !id.empty?
+          [:continuation, id]
+        in ["SendMessage", _]
+          :new_task
         end
       end
 
-      env = { "a2a.request" => {} }
-      result = agent.handlers.first.call(env)
-      result.should == { "echo" => true }
-    end
-
-    it "returns a Schema::Definition from respond_with" do
-      schema_obj = A2A::Protocol::JsonSchema["Task"].new(
-        "id"        => "t-1",
-        "contextId" => "c-1",
-        "status"    => { "state" => "TASK_STATE_COMPLETED", "timestamp" => "2025-01-01T00:00:00.000Z" },
+      request = A2A::Protocol::JsonSchema["Send Message Request"].new(
+        message: { "taskId" => "t-1", "role" => "ROLE_USER" }
       )
+      agent.call({ "a2a.operation" => "SendMessage", "a2a.request" => request })
+        .should == [:continuation, "t-1"]
 
-      agent = A2A::Agent.new do
-        on "GetTask" do
-          respond_with -> (env) { schema_obj }
-        end
-      end
-
-      env = { "a2a.request" => {} }
-      result = agent.handlers.first.call(env)
-      result.should == schema_obj
-    end
-
-    it "passes env to the respond_with lambda" do
-      seen_env = nil
-
-      agent = A2A::Agent.new do
-        on "SendMessage" do
-          respond_with -> (env) { seen_env = env; :ok }
-        end
-      end
-
-      env = { "a2a.request" => { "msg" => "hi" } }
-      agent.handlers.first.call(env)
-      seen_env.should == env
-    end
-
-    it "executes middleware in order" do
-      order = []
-
-      mw1 = Class.new do
-        define_method(:initialize) { |app| @app = app }
-        define_method(:call) { |env| order << :mw1; @app.call(env) }
-      end
-
-      mw2 = Class.new do
-        define_method(:initialize) { |app| @app = app }
-        define_method(:call) { |env| order << :mw2; @app.call(env) }
-      end
-
-      agent = A2A::Agent.new do
-        on "SendMessage" do
-          use mw1
-          use mw2
-          respond_with -> (env) { order << :terminal; :done }
-        end
-      end
-
-      env = { "a2a.request" => {} }
-      agent.handlers.first.call(env)
-      order.should == [:mw1, :mw2, :terminal]
-    end
-
-    it "middleware can intercept and return early" do
-      blocker = Class.new do
-        define_method(:initialize) { |app| @app = app }
-        define_method(:call) { |env| :blocked }
-      end
-
-      agent = A2A::Agent.new do
-        on "SendMessage" do
-          use blocker
-          respond_with -> (env) { :should_not_reach }
-        end
-      end
-
-      env = { "a2a.request" => {} }
-      result = agent.handlers.first.call(env)
-      result.should == :blocked
-    end
-
-    # ── Error behavior ─────────────────────────────────────────────────
-    # Errors propagate to the Dispatcher which catches them.
-
-    it "lets A2A::Error propagate (Dispatcher catches it)" do
-      agent = A2A::Agent.new do
-        on "GetTask" do
-          respond_with -> (env) {
-            raise A2A::TaskNotFoundError.new("task-abc")
-          }
-        end
-      end
-
-      env = { "a2a.request" => {} }
-      lambda { agent.handlers.first.call(env) }.should.raise(A2A::TaskNotFoundError)
-    end
-
-    it "lets unexpected errors propagate" do
-      agent = A2A::Agent.new do
-        on "SendMessage" do
-          respond_with -> (env) {
-            raise RuntimeError, "unexpected bug"
-          }
-        end
-      end
-
-      env = { "a2a.request" => {} }
-      lambda { agent.handlers.first.call(env) }.should.raise(RuntimeError)
+      request = A2A::Protocol::JsonSchema["Send Message Request"].new(
+        message: { "role" => "ROLE_USER" }
+      )
+      agent.call({ "a2a.operation" => "SendMessage", "a2a.request" => request })
+        .should == :new_task
     end
   end

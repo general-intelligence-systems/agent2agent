@@ -1,1 +1,0 @@
-../../examples/full/readme.md

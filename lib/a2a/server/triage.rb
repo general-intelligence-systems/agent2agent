@@ -10,7 +10,7 @@ module A2A
     # Reads the raw protocol data left in env by the binding middleware
     # (JSON-RPC method name or HTTP verb + path), looks up the matching
     # Proto::Operation, wraps the request body into a Schema::Definition,
-    # and sets env keys for downstream consumption by the Dispatcher.
+    # and sets env keys for downstream consumption by the agent.
     #
     # Env keys read:
     #   "a2a.json_rpc_method" — set by Bindings::JsonRpc

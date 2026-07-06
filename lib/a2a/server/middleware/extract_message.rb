@@ -9,22 +9,16 @@ module A2A
       # Extracts text from the request message's parts and sets
       # `env["a2a.message"]` to the joined text string.
       #
+      # Part of the A2A::Server middleware stack. Requests whose
+      # operation carries no message pass through untouched, so
+      # env["a2a.message"] is only present when a message is.
+      #
       # Replaces the common `extract_text` lambda pattern found in examples:
       #
       #   extract_text = ->(message) {
       #     parts = message.parts || []
       #     parts.filter_map { |p| p.text }.join("\n")
       #   }
-      #
-      # Usage:
-      #
-      #   on "SendMessage" do
-      #     use A2A::Server::Middleware::ExtractMessage
-      #     respond_with -> (env) {
-      #       text = env["a2a.message"]
-      #       # ...
-      #     }
-      #   end
       #
       class ExtractMessage
         def initialize(app)
@@ -33,12 +27,14 @@ module A2A
 
         def call(env)
           request = env["a2a.request"]
-          message = request.message
-          parts   = message.parts || []
 
-          env["a2a.message"] = parts.filter_map { |p|
-            p.respond_to?(:text) ? p.text : p["text"]
-          }.join("\n")
+          if request.respond_to?(:message) && (message = request.message)
+            parts = message.parts || []
+
+            env["a2a.message"] = parts.filter_map { |p|
+              p.respond_to?(:text) ? p.text : p["text"]
+            }.join("\n")
+          end
 
           @app.call(env)
         end
@@ -117,5 +113,33 @@ __END__
 
       result = mw.call(env)
       result.should == "from hash"
+    end
+
+    it "passes through when the request has no message reader" do
+      request = Object.new
+
+      downstream = -> (env) { env.key?("a2a.message") }
+      mw = A2A::Server::Middleware::ExtractMessage.new(downstream)
+      env = { "a2a.request" => request }
+
+      mw.call(env).should == false
+    end
+
+    it "passes through when the message is nil" do
+      request = Object.new
+      request.define_singleton_method(:message) { nil }
+
+      downstream = -> (env) { env.key?("a2a.message") }
+      mw = A2A::Server::Middleware::ExtractMessage.new(downstream)
+      env = { "a2a.request" => request }
+
+      mw.call(env).should == false
+    end
+
+    it "passes through when there is no request" do
+      downstream = -> (env) { env.key?("a2a.message") }
+      mw = A2A::Server::Middleware::ExtractMessage.new(downstream)
+
+      mw.call({}).should == false
     end
   end

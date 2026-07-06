@@ -7,20 +7,13 @@ module A2A
   class Server
     module Middleware
       # Clamps `request.page_size` to a valid range and sets
-      # `env["a2a.page_size"]` for downstream handlers.
+      # `env["a2a.page_size"]` for the agent.
       #
       # Accepts a single integer — the maximum page size (also used as the
       # default when the client doesn't specify one). Clamps to [1, max].
       #
-      # Usage:
-      #
-      #   on "ListTasks" do
-      #     use A2A::Server::Middleware::LimitPaginationSize, 50
-      #     respond_with -> (env) {
-      #       page_size = env["a2a.page_size"]
-      #       # ...
-      #     }
-      #   end
+      # Part of the A2A::Server middleware stack — the max comes from
+      # `A2A::Server.new(page_size: 50)`.
       #
       class LimitPaginationSize
         def initialize(app, max = 100)

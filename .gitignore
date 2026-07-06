@@ -8,3 +8,7 @@ refs
 *.swo
 *.swp
 
+
+# Jekyll docs build artifacts
+docs/_site
+docs/.jekyll-cache

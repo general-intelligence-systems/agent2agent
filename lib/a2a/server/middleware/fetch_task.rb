@@ -14,14 +14,13 @@ module A2A
       # Use `id_field:` to read from a different field, and `from:` to
       # read from a nested object on the request.
       #
-      # Usage:
+      # Not part of the default A2A::Server stack (it needs a store, and
+      # the ID field varies per operation) — wrap your agent with it:
       #
-      #   on "SendMessage" do
-      #     use A2A::Server::Middleware::FetchTask, store: sqlite_store, id_field: :task_id, from: :message
-      #     respond_with -> (env) {
-      #       existing = env["a2a.task"]  # nil if new task
-      #     }
-      #   end
+      #   agent = A2A::Server::Middleware::FetchTask.new(
+      #     A2A.agent { |env| existing = env["a2a.task"] }, # nil if new task
+      #     store: sqlite_store, id_field: :task_id, from: :message
+      #   )
       #
       class FetchTask
         def initialize(app, store:, id_field: :id, from: nil)
@@ -49,19 +48,12 @@ module A2A
       # Use `id_field:` to read from a different field, and `from:` to
       # read from a nested object on the request.
       #
-      # Usage:
+      # Not part of the default A2A::Server stack — wrap your agent with it:
       #
-      #   on "GetTask" do
-      #     use A2A::Server::Middleware::FetchTaskOrRaise, store: sqlite_store
-      #     respond_with -> (env) {
-      #       task = env["a2a.task"]
-      #     }
-      #   end
-      #
-      #   on "GetTaskPushNotificationConfig" do
-      #     use A2A::Server::Middleware::FetchTaskOrRaise, store: sqlite_store, id_field: :task_id
-      #     respond_with -> (env) { ... }
-      #   end
+      #   agent = A2A::Server::Middleware::FetchTaskOrRaise.new(
+      #     A2A.agent { |env| task = env["a2a.task"] },
+      #     store: sqlite_store
+      #   )
       #
       class FetchTaskOrRaise
         def initialize(app, store:, id_field: :id, from: nil)

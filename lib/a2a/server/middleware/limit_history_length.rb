@@ -14,22 +14,12 @@ module A2A
       # doesn't specify a history_length, the server cap is used.
       #
       # `env["a2a.history_length"]` is always an Integer (0..max).
-      # The handler applies it unconditionally:
+      # The agent applies it unconditionally:
       #
       #   result["history"] = task[:history]&.last(limit)
       #
-      # Usage:
-      #
-      #   on "GetTask" do
-      #     use A2A::Server::Middleware::FetchTaskOrRaise, store: sqlite_store
-      #     use A2A::Server::Middleware::LimitHistoryLength, 20
-      #     respond_with -> (env) {
-      #       task  = env["a2a.task"]
-      #       limit = env["a2a.history_length"]
-      #       # ...
-      #       result["history"] = task[:history]&.last(limit)
-      #     }
-      #   end
+      # Part of the A2A::Server middleware stack — the max comes from
+      # `A2A::Server.new(history_length: 20)`.
       #
       class LimitHistoryLength
         def initialize(app, max)

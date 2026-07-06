@@ -15,24 +15,20 @@ module A2A
       # The `open` block runs inside an Async fiber and the stream is
       # automatically finished when the block exits (even on exception).
       #
-      # If the handler never calls `open`, the builder is removed from env
+      # If the agent never calls `open`, the builder is removed from env
       # so the binding layer doesn't mistake it for a real stream.
       #
-      # Part of the A2A::Server middleware stack, so every handler gets
-      # env["a2a.stream"] without declaring anything. Declaring
-      # `use A2A::Server::Middleware::SSEStream` in a handler is harmless — the
-      # inner builder simply shadows the outer one.
+      # Part of the A2A::Server middleware stack, so the agent gets
+      # env["a2a.stream"] without declaring anything.
       #
       # Usage:
       #
-      #   on "SendStreamingMessage" do
-      #     use A2A::Server::Middleware::ExtractMessage
-      #     respond_with -> (env) {
-      #       env["a2a.stream"].open(task_id: "t1", context_id: "c1") do |s|
-      #         s.task(status: { state: "TASK_STATE_WORKING" })
-      #         s.status_update(status: { state: "TASK_STATE_COMPLETED" })
-      #       end
-      #     }
+      #   case env["a2a.operation"]
+      #   in "SendStreamingMessage"
+      #     env["a2a.stream"].open(task_id: "t1", context_id: "c1") do |s|
+      #       s.task(status: { state: "TASK_STATE_WORKING" })
+      #       s.status_update(status: { state: "TASK_STATE_COMPLETED" })
+      #     end
       #   end
       #
       class SSEStream

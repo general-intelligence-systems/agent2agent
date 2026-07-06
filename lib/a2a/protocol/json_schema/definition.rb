@@ -71,6 +71,16 @@ module A2A
           raise "A2A::Protocol::JsonSchema::Definition should NOT be instantiated directly"
         end
 
+        # Reverse of snake_to_camel_map. Built first-entry-wins: the
+        # factory inserts the snake_case key before the camelCase
+        # identity key, so camelCase storage keys map back to their
+        # snake_case reader names.
+        def self.camel_to_snake_map
+          @camel_to_snake_map ||= snake_to_camel_map.each_with_object({}) do |(key, camel), map|
+            map[camel] ||= key
+          end
+        end
+
         # --- validation ----------------------------------------------------
 
         def valid?
@@ -98,6 +108,36 @@ module A2A
 
         def ==(other)
           other.is_a?(Definition) && to_h == other.to_h
+        end
+
+        # --- pattern matching ------------------------------------------------
+
+        # Supports Ruby hash pattern matching:
+        #
+        #   case env["a2a.request"].message
+        #   in { task_id: String => id, parts: }
+        #     ...
+        #   end
+        #
+        # Keys are the snake_case property names, same as the reader
+        # methods (camelCase symbols also work). Absent properties are
+        # omitted from the result so patterns that require them fail to
+        # match. Nested Definition values are returned as-is, so
+        # patterns can destructure recursively.
+        def deconstruct_keys(keys)
+          snake = self.class.snake_to_camel_map
+
+          if keys
+            keys.each_with_object({}) do |key, result|
+              camel = snake[key.to_s] || key.to_s
+              result[key] = @data[camel] if @data.key?(camel)
+            end
+          else
+            camel_to_snake = self.class.camel_to_snake_map
+            @data.each_with_object({}) do |(camel, value), result|
+              result[(camel_to_snake[camel] || camel).to_sym] = value
+            end
+          end
         end
 
         def inspect
@@ -148,3 +188,89 @@ module A2A
     end
 end
 end
+
+__END__
+  describe "A2A::Protocol::JsonSchema::Definition#deconstruct_keys" do
+    schema = A2A::Protocol::JsonSchema
+
+    it "matches snake_case keys" do
+      msg = schema["Message"].new(role: "ROLE_USER", message_id: "m-1", task_id: "t-1")
+
+      case msg
+      in { task_id: String => id, role: }
+        id.should == "t-1"
+        role.should == "ROLE_USER"
+      end
+    end
+
+    it "matches camelCase keys" do
+      msg = schema["Message"].new(role: "ROLE_USER", task_id: "t-1")
+
+      case msg
+      in { taskId: String => id }
+        id.should == "t-1"
+      end
+    end
+
+    it "omits absent properties so patterns requiring them fail" do
+      msg = schema["Message"].new(role: "ROLE_USER")
+
+      matched = case msg
+      in { task_id: String }
+        true
+      else
+        false
+      end
+
+      matched.should == false
+    end
+
+    it "omits absent properties rather than yielding nil" do
+      msg = schema["Message"].new(role: "ROLE_USER")
+      msg.deconstruct_keys([:task_id]).key?(:task_id).should == false
+    end
+
+    it "destructures nested Definitions recursively" do
+      task = schema["Task"].new(
+        id:         "t-1",
+        context_id: "c-1",
+        status:     { "state" => "TASK_STATE_WORKING", "timestamp" => "2025-01-01T00:00:00.000Z" },
+      )
+
+      case task
+      in { status: { state: } }
+        state.should == "TASK_STATE_WORKING"
+      end
+    end
+
+    it "destructures Definitions inside arrays" do
+      msg = schema["Message"].new(
+        role:       "ROLE_USER",
+        message_id: "m-1",
+        parts:      [{ "text" => "hello" }],
+      )
+
+      case msg
+      in { parts: [{ text: }] }
+        text.should == "hello"
+      end
+    end
+
+    it "returns all properties as snake_case symbols for a nil key filter" do
+      msg = schema["Message"].new(role: "ROLE_USER", message_id: "m-1")
+      msg.deconstruct_keys(nil).should == { role: "ROLE_USER", message_id: "m-1" }
+    end
+
+    it "supports guarded operation-style matching" do
+      msg = schema["Message"].new(role: "ROLE_USER", message_id: "m-1", task_id: "")
+
+      matched = case msg
+      in { task_id: String => id } if !id.empty?
+        :continuation
+      else
+        :new_task
+      end
+
+      matched.should == :new_task
+    end
+  end
