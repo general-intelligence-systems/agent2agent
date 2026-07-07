@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    agent2agent (1.1.1)
+    agent2agent (2.0.0)
       async
       async-http (~> 0.95)
       async-http-faraday (~> 0.22)
