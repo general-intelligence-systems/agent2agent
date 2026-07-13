@@ -15,6 +15,7 @@
           nativeBuildInputs = [ pkgs.pkg-config ];
 
           buildInputs = [
+            pkgs.trufflehog
             ruby
             pkgs.libyaml 
             pkgs.openssl
